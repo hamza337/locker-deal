@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaRunning, FaTrophy, FaUserPlus, FaHandshake, FaBell } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 
 const matchOpportunities = [
   { name: 'PRO SPORTS VENTURES', count: '08' },
@@ -134,7 +135,7 @@ const Dashboard = () => {
           <div className="bg-[rgba(0,0,0,0.3)] rounded-xl p-4 md:p-6 flex flex-col min-h-[340px]">
             <div className="flex items-center justify-between mb-4">
               <span className="text-white font-bold text-lg md:text-xl">MESSAGES</span>
-              <button className="bg-black text-white px-4 py-1 rounded-md font-bold hover:bg-[#9afa00] hover:text-black transition-colors">See All</button>
+              <Link to="/chats" className="bg-black text-white px-4 py-1 rounded-md font-bold hover:bg-[#9afa00] hover:text-black transition-colors">See All</Link>
             </div>
             <div className="flex flex-col gap-4 mt-2">
               {messages.map((msg, idx) => (

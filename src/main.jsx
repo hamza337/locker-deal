@@ -9,6 +9,8 @@ import AthleteForm from './pages/auth/forms/AthleteForm'
 import Otp from './pages/auth/otp/Otp';
 import Layout from './components/layout';
 import Dashboard from './pages/dashboard/Dashboard';
+import Inbox from './pages/inbox/Inbox';
+import BrandDashboard from './pages/brandDashboard/brandDashboard';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -20,6 +22,8 @@ createRoot(document.getElementById('root')).render(
         <Route path="/signup/brand" element={<BrandForm />} />
         <Route path="/verify-otp" element={<Otp />} />
         <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+        <Route path="/chats" element={<Layout><Inbox /></Layout>} />
+        <Route path="/brand/dashboard" element={<Layout><BrandDashboard /></Layout>} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
