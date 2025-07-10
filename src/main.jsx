@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
-import Login from './pages/auth/login/login';
+import Login from './pages/auth/login/Login';
 import RoleSelection from './pages/auth/role/RoleSelection';
 import BrandForm from './pages/auth/forms/BrandForm'
 import AthleteForm from './pages/auth/forms/AthleteForm'
