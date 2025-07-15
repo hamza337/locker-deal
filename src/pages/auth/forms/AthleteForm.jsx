@@ -6,24 +6,24 @@ const AthleteForm = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen w-screen bg-cover bg-center flex flex-col items-center justify-center relative px-4 py-8" style={{ backgroundImage: 'url(/bgApp.png)' }}>
+    <div className="min-h-screen w-full bg-cover bg-center flex flex-col items-center justify-center relative px-4 sm:px-8 md:px-12 py-8 md:py-12" style={{ backgroundImage: 'url(/bgApp.png)' }}>
       {/* Top row: Centered logo and right-aligned link */}
-      <div className="w-full max-w-6xl flex items-center justify-center mt-4 mb-8 relative">
-        <div className="flex-1 flex justify-center">
-          <img src="/appLogo.png" alt="Locker Deal Logo" className="h-16" />
+      <div className="w-full max-w-4xl flex flex-col md:flex-row items-center md:justify-between mt-4 mb-8 gap-2 md:gap-0">
+        <div className="flex justify-center w-full md:w-auto">
+          <img src="/appLogo.png" alt="Locker Deal Logo" className="h-14 md:h-16" />
         </div>
         <Link
           to="/login"
-          className="absolute right-0 top-1 text-[#9afa00] font-bold text-md"
+          className="text-[#9afa00] font-bold text-md mt-2 md:mt-0"
         >
           Already have an account?
         </Link>
       </div>
       {/* Heading */}
-      <h2 className="text-white text-3xl md:text-4xl font-bold text-center mb-8 tracking-wide">ATHLETE</h2>
+      <h2 className="text-white text-2xl md:text-4xl font-bold text-center mb-8 tracking-wide">ATHLETE</h2>
       {/* Form */}
-      <form className="w-full max-w-6xl bg-transparent flex flex-col gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <form className="w-full max-w-lg md:max-w-4xl bg-transparent flex flex-col gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
           {/* First Name */}
           <div>
             <label className="block text-white font-bold mb-2" htmlFor="firstName">First Name</label>
@@ -31,7 +31,7 @@ const AthleteForm = () => {
               id="firstName"
               type="text"
               placeholder="Enter your First Name"
-              className="w-full bg-black bg-opacity-60 border border-white rounded-md px-6 py-4 text-white placeholder-gray-400 outline-none"
+              className="w-full bg-black bg-opacity-60 border border-white rounded-md px-4 md:px-6 py-3 md:py-4 text-white placeholder-gray-400 outline-none"
             />
           </div>
           {/* Last Name */}
@@ -41,13 +41,13 @@ const AthleteForm = () => {
               id="lastName"
               type="text"
               placeholder="Enter your Last Name"
-              className="w-full bg-black bg-opacity-60 border border-white rounded-md px-6 py-4 text-white placeholder-gray-400 outline-none"
+              className="w-full bg-black bg-opacity-60 border border-white rounded-md px-4 md:px-6 py-3 md:py-4 text-white placeholder-gray-400 outline-none"
             />
           </div>
           {/* Email */}
           <div>
             <label className="block text-white font-bold mb-2" htmlFor="email">Email</label>
-            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-6 py-4">
+            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-4 md:px-6 py-3 md:py-4">
               <FaEnvelope className="text-[#9afa00] mr-2" />
               <input
                 id="email"
@@ -60,7 +60,7 @@ const AthleteForm = () => {
           {/* Confirm Email */}
           <div>
             <label className="block text-white font-bold mb-2" htmlFor="confirmEmail">Confirm Email</label>
-            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-6 py-4">
+            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-4 md:px-6 py-3 md:py-4">
               <FaEnvelope className="text-[#9afa00] mr-2" />
               <input
                 id="confirmEmail"
@@ -73,7 +73,7 @@ const AthleteForm = () => {
           {/* Password */}
           <div>
             <label className="block text-white font-bold mb-2" htmlFor="password">Password</label>
-            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-6 py-4">
+            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-4 md:px-6 py-3 md:py-4">
               <FaLock className="text-[#9afa00] mr-2" />
               <input
                 id="password"
@@ -86,7 +86,7 @@ const AthleteForm = () => {
           {/* Confirm Password */}
           <div>
             <label className="block text-white font-bold mb-2" htmlFor="confirmPassword">Confirm Password</label>
-            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-6 py-4">
+            <div className="flex items-center bg-black bg-opacity-60 border border-white rounded-md px-4 md:px-6 py-3 md:py-4">
               <FaLock className="text-[#9afa00] mr-2" />
               <input
                 id="confirmPassword"

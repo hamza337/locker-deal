@@ -4,20 +4,20 @@ import { Link } from 'react-router-dom';
 
 const Login = () => {
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-cover bg-center" style={{ backgroundImage: 'url(/bgApp.png)' }}>
-      <div className="flex flex-col md:flex-row w-full max-w-8xl bg-opacity-70 overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-cover bg-center" style={{ backgroundImage: 'url(/bgApp.png)' }}>
+      <div className="flex flex-col md:flex-row w-full max-w-4xl md:max-w-5xl mx-auto bg-opacity-70 overflow-hidden gap-0">
         {/* Left: Login Form */}
-        <div className="flex-1 flex flex-col justify-center px-48 py-12 md:py-20">
+        <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 md:px-12 lg:px-16 xl:px-20 py-12 md:py-20 max-w-md md:max-w-lg mx-auto">
           <div className="mb-8 flex flex-col items-center">
             {/* App Logo */}
-            <img src="/appLogo.png" alt="Locker Deal Logo" className="h-16 mb-2 mx-auto" />
+            <img src="/appLogo.png" alt="Locker Deal Logo" className="h-14 md:h-16 mb-2 mx-auto" />
             <h2 className="text-white text-2xl md:text-4xl font-bold mt-8 mb-6">LOG IN</h2>
           </div>
-          <form className="space-y-6">
+          <form className="space-y-6 w-full">
             {/* Email */}
             <div>
               <label className="block text-white font-bold text-md mb-2" htmlFor="email">Email</label>
-              <div className="flex items-center bg-black bg-opacity-60 rounded-md border border-white px-6 py-5">
+              <div className="flex items-center bg-black bg-opacity-60 rounded-md border border-white px-4 md:px-6 py-4 md:py-5">
                 <FaEnvelope className="text-lime-400 mr-2" />
                 <input
                   id="email"
@@ -30,7 +30,7 @@ const Login = () => {
             {/* Password */}
             <div>
               <label className="block text-white font-bold text-md mb-2" htmlFor="password">Password</label>
-              <div className="flex items-center bg-black bg-opacity-60 rounded-md border border-white px-6 py-5">
+              <div className="flex items-center bg-black bg-opacity-60 rounded-md border border-white px-4 md:px-6 py-4 md:py-5">
                 <FaLock className="text-lime-400 mr-2" />
                 <input
                   id="password"
@@ -38,7 +38,7 @@ const Login = () => {
                   placeholder="••••••••••••"
                   className="bg-transparent outline-none text-white flex-1 placeholder-gray-300"
                 />
-                <a href="/forget-password" className="text-[#9afa00] text-s ml-2 whitespace-nowrap">Reset Password</a>
+                <a href="/forget-password" className="text-[#9afa00] text-xs md:text-s ml-2 whitespace-nowrap">Reset Password</a>
               </div>
             </div>
             {/* Login Button */}
