@@ -34,11 +34,14 @@ const statCards = [
 const Dashboard = () => {
   return (
     <>
-      <div className="flex flex-col md:flex-row items-center justify-between mb-1 bg-[#9BF9000D] px-4 md:px-16 py-4 gap-2 md:gap-0">
-        <div className="flex items-center gap-4 md:gap-8 w-full md:w-auto justify-center md:justify-start">
-          <span className="text-[#9afa00] text-lg md:text-2xl font-bold border-b-4 border-[#9afa00] pb-1">DASHBOARD</span>
+      <div className="flex flex-row items-center justify-between mb-1 bg-[#9BF9000D] px-4 md:px-16 py-4 gap-2">
+        <div className="flex flex-col">
+          <span className="text-[#9afa00] text-lg md:text-2xl font-bold border-b-0 pb-1">DASHBOARD</span>
+          <div className="h-2 mt-1" style={{ width: '120px' }}>
+            <div className="h-1 bg-[#9afa00] w-full rounded" />
+          </div>
         </div>
-        <FaBell className="text-[#9afa00] text-xl md:text-2xl md:text-3xl mt-2 md:mt-0" />
+        <FaBell className="text-[#9afa00] text-xl md:text-2xl md:text-3xl" />
       </div>
       <div className="min-h-screen w-full bg-cover bg-center px-2 md:px-8 py-4" style={{ backgroundImage: "url('/bgApp.png')" }}>
         {/* Greeting */}
@@ -49,14 +52,14 @@ const Dashboard = () => {
           {statCards.map((card, idx) => (
             <div
               key={card.label}
-              className="border border-[#9afa00] rounded-xl flex items-center gap-4 md:gap-6 px-4 md:px-8 py-4 md:py-6 bg-[rgba(0,0,0,0.3)]"
+              className="border border-[#9afa00] rounded-xl flex flex-col items-center min-w-0 px-4 md:px-8 py-4 md:py-6 bg-[rgba(0,0,0,0.3)]"
             >
-              <div className="bg-[rgba(0,0,0,0.3)] rounded-lg flex items-center justify-center w-12 h-12 md:w-16 md:h-16">
+              <div className="bg-[rgba(0,0,0,0.3)] rounded-lg flex items-center justify-center w-12 h-12 md:w-16 md:h-16 min-w-0 mb-2">
                 {card.icon}
               </div>
-              <div className="flex flex-col justify-center">
-                <span className="text-white font-bold uppercase text-base md:text-xl tracking-wide">{card.label}</span>
-                <span className="text-[#9afa00] font-bold text-xl md:text-3xl mt-2">{card.value}</span>
+              <div className="flex flex-col items-center justify-center min-w-0 w-full">
+                <span className="text-white font-bold uppercase text-base md:text-xl tracking-wide text-center break-words w-full">{card.label}</span>
+                <span className="text-[#9afa00] font-bold text-xl md:text-3xl mt-2 text-center break-words w-full">{card.value}</span>
               </div>
             </div>
           ))}

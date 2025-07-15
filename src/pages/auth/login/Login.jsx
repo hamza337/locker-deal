@@ -1,8 +1,9 @@
 import React from 'react';
 import { FaEnvelope, FaLock } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-cover bg-center" style={{ backgroundImage: 'url(/bgApp.png)' }}>
       <div className="flex flex-col md:flex-row w-full max-w-4xl md:max-w-5xl mx-auto bg-opacity-70 overflow-hidden gap-0">
@@ -38,12 +39,13 @@ const Login = () => {
                   placeholder="••••••••••••"
                   className="bg-transparent outline-none text-white flex-1 placeholder-gray-300"
                 />
-                <a href="/forget-password" className="text-[#9afa00] text-xs md:text-s ml-2 whitespace-nowrap">Reset Password</a>
+                <a href="/" className="text-[#9afa00] text-xs md:text-s ml-2 whitespace-nowrap">Reset Password</a>
               </div>
             </div>
             {/* Login Button */}
             <button
-              type="submit"
+              onClick={() => navigate('/brand/dashboard')}
+              // type="submit"
               className="w-full mt-6 bg-[#9afa00] text-black font-bold py-4 rounded-md text-lg tracking-wider shadow-md cursor-pointer transition-shadow duration-300 hover:shadow-[0_0_24px_6px_#9afa00]"
             >
               LOG IN
