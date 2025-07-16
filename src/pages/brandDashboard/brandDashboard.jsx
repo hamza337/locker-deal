@@ -3,13 +3,11 @@ import BrandDashboardHome from '../../components/brand/BrandDashboardHome';
 import BrandAthlete from '../../components/brand/BrandAthlete';
 import BrandCompaigns from '../../components/brand/BrandCompaigns';
 import BrandContracts from '../../components/brand/BrandContracts';
-import BrandJobBoard from '../../components/brand/BrandJobBoard';
 
 const TABS = [
   { label: 'Dashboard', key: 'dashboard' },
   { label: 'Athlete', key: 'athlete' },
   { label: 'Campaigns', key: 'campaigns' },
-  { label: 'Job Board', key: 'jobboard' },
   { label: 'Contracts', key: 'contracts' },
 ];
 
@@ -17,7 +15,6 @@ const TAB_COMPONENTS = {
   dashboard: <BrandDashboardHome />,
   athlete: <BrandAthlete />,
   campaigns: <BrandCompaigns />,
-  jobboard: <BrandJobBoard />,
   contracts: <BrandContracts />,
 };
 

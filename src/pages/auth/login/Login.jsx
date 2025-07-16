@@ -59,7 +59,7 @@ const Login = () => {
         {/* Right: Basketball Player Image */}
         <div className="hidden md:flex flex-1 items-center justify-center relative bg-transparent">
           <img
-            src="/bbp.png"
+            src="/bbpp.png"
             alt="Basketball Player"
             className="w-full h-full object-contain max-h-[600px] drop-shadow-2xl"
           />

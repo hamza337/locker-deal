@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaTiktok, FaFacebookF, FaInstagram, FaLock } from 'react-icons/fa';
+import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes } from 'react-icons/fa';
 
 const athletes = [
   {
@@ -62,6 +62,55 @@ const athletes = [
 
 const BrandAthlete = () => {
   const [showFilters, setShowFilters] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('bronze');
+  const [payAnnually, setPayAnnually] = useState(false);
+
+  const plans = [
+    {
+      key: 'bronze',
+      label: 'BRONZE',
+      price: '$500 per month',
+      icon: <FaTrophy className="text-[#9afa00] text-4xl" />,
+      features: [
+        '15% Transaction fee.',
+        'Access to all athletes',
+        'Direct Campaigns',
+      ],
+      details: 'Annual Commitment',
+      moreDetails: ['15% Transaction fee.', 'Access to all athletes', 'Direct Campaigns'],
+    },
+    {
+      key: 'silver',
+      label: 'SILVER',
+      price: '$500 per month',
+      icon: <FaTrophy className="text-gray-300 text-4xl" />,
+      features: [
+        '10% Transaction fee.',
+        'Tier 1 Support',
+        'Direct Campaigns',
+        'Open Campaigns',
+        'Access to all athletes',
+        'Product Campaigns',
+      ],
+      details: 'Annual Commitment',
+      moreDetails: ['10% Transaction fee.', 'Tier 1 Support', 'Direct Campaigns', 'Open Campaigns', 'Access to all athletes', 'Product Campaigns'],
+    },
+    {
+      key: 'icon',
+      label: 'STAND ALONE',
+      price: '$500 per month',
+      icon: <FaBriefcase className="text-[#9afa00] text-4xl" />,
+      features: [
+        'Leverage icon source platform to target, recruit & hire elite athletes to your team!',
+        'No Setup Fee',
+        'Access to all athletes',
+        'No Transaction Fee',
+      ],
+      details: 'Annual Commitment',
+      moreDetails: ['Leverage icon source platform to target, recruit & hire elite athletes to your team!', 'No Setup Fee', 'Access to all athletes', 'No Transaction Fee'],
+    },
+  ];
 
   return (
     <div className="w-full flex flex-col md:flex-row gap-4 md:gap-8 h-auto md:h-[calc(100vh-120px)] px-2 md:px-4">
@@ -132,11 +181,100 @@ const BrandAthlete = () => {
                   <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaFacebookF className="text-[#9afa00] text-lg" /></a>
                   <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaInstagram className="text-[#9afa00] text-lg" /></a>
                 </div>
-                <button className="w-full bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-md hover:bg-[#baff32] transition">View Profile</button>
+                <button 
+                  className="w-full bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-md hover:bg-[#baff32] transition"
+                  onClick={() => setShowModal(true)}
+                >
+                  View Profile
+                </button>
               </div>
             </div>
           ))}
         </div>
+        {/* Modal Popup */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-40 backdrop-blur-sm px-2 md:px-0">
+            <div className="relative w-full max-w-lg md:max-w-2xl bg-[#1B2317] rounded-2xl shadow-lg p-6 md:p-10 flex flex-col items-center animate-fadeIn">
+              {/* Close Button */}
+              <button
+                className="absolute top-4 right-4 text-[#9afa00] text-2xl hover:text-white transition"
+                onClick={() => setShowModal(false)}
+                aria-label="Close"
+              >
+                <FaTimes />
+              </button>
+              {/* Title */}
+              <h2 className="text-white text-lg md:text-2xl font-bold mb-2 text-center uppercase tracking-wide">Choose a Subscription Plan to Get Started</h2>
+              {/* Plan Tabs */}
+              <div className="flex w-full justify-center gap-2 md:gap-6 mb-6 mt-2">
+                {plans.map(plan => (
+                  <button
+                    key={plan.key}
+                    onClick={() => setSelectedPlan(plan.key)}
+                    className={`flex flex-col items-center px-4 py-3 rounded-xl border-2 transition-all duration-200 min-w-[110px] md:min-w-[180px] ${selectedPlan === plan.key ? 'border-[#9afa00] bg-[#181c1a]' : 'border-transparent bg-black bg-opacity-60'} hover:border-[#9afa00]`}
+                  >
+                    {plan.icon}
+                    <span className={`mt-2 font-bold text-base md:text-lg ${selectedPlan === plan.key ? 'text-[#9afa00]' : 'text-white'}`}>{plan.label}</span>
+                    <span className="text-xs md:text-sm text-gray-300 mt-1">{plan.price}</span>
+                  </button>
+                ))}
+              </div>
+              {/* Plan Details */}
+              <div className="w-full rounded-xl p-4 md:p-6 flex flex-col items-center mb-4">
+                <span className="text-[#9afa00] font-bold text-sm md:text-base mb-2">Annual Commitment <span className="text-[#9afa00] underline cursor-pointer ml-2">More Details</span></span>
+                <div className="flex flex-col md:flex-row flex-wrap gap-2 md:gap-4 w-full justify-center items-center mb-2 mt-2">
+                  {plans.find(p => p.key === selectedPlan).moreDetails.map((feature, i) => (
+                    <span key={i} className="flex items-center gap-2 text-white text-xs md:text-sm"><span className="text-[#9afa00]">✔</span> {feature}</span>
+                  ))}
+                </div>
+                {/* Example: extra toggle for icon plan */}
+                {selectedPlan === 'icon' && (
+                  <div className="flex items-center gap-3 mt-2 w-full">
+                    <button
+                      type="button"
+                      aria-pressed={payAnnually}
+                      onClick={() => setPayAnnually(v => !v)}
+                      className={`w-12 h-8 flex items-center rounded-full transition-colors duration-200 focus:outline-none ${payAnnually ? 'bg-[#9afa00]' : 'bg-[#181c1a]'}`}
+                    >
+                      <span
+                        className={`inline-block w-6 h-6 bg-white rounded-full shadow transform transition-transform duration-200 ${payAnnually ? 'translate-x-4' : 'translate-x-1'}`}
+                      />
+                    </button>
+                    <span className="text-white text-base md:text-lg font-normal">Pay annually and get 2 months free</span>
+                  </div>
+                )}
+                {selectedPlan === 'silver' && (
+                  <div className="w-full flex flex-col gap-2 mt-2">
+                    <div className="flex items-start gap-2 bg-black bg-opacity-60 rounded-lg p-3">
+                      <input type="checkbox" id="icon-standalone" className="accent-[#9afa00] w-4 h-4 mt-1" />
+                      <label htmlFor="icon-standalone" className="text-white text-xs md:text-sm flex flex-col">
+                        <span className="font-bold text-white text-sm md:text-base">ICON JOBS STANDS ALONE <span className="text-gray-300 font-normal">$500 per month</span></span>
+                        <span className="text-gray-300 text-xs md:text-sm">Leverage icon source platform to target, recruit & hire elite athletes to your team!</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Modal Actions */}
+              <div className="flex w-full gap-4 mt-2">
+                <button
+                  className="flex-1 bg-[#232626] text-white font-bold py-2 rounded-md uppercase text-xs md:text-base border border-[#9afa00] hover:bg-[#181c1a] transition"
+                  onClick={() => setShowModal(false)}
+                >
+                  Close
+                </button>
+                <button
+                  className="flex-1 bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-base hover:bg-[#baff32] transition"
+                >
+                  Continue
+                </button>
+              </div>
+              <div className="w-full text-center mt-4">
+                <span className="text-gray-300 text-xs md:text-sm">Not sure which plan suits you? <span className="text-[#9afa00] underline cursor-pointer">Contact our team</span></span>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

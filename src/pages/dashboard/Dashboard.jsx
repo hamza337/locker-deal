@@ -1,163 +1,40 @@
-import React from 'react';
-import { FaRunning, FaTrophy, FaUserPlus, FaHandshake, FaBell } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import AthleteDashboardHome from '../../components/athlete/AthleteDashboardHome';
+import AthleteAiAssistant from '../../components/athlete/AthleteAiAssistant';
+import { FaBell } from 'react-icons/fa';
 
-const matchOpportunities = [
-  { name: 'PRO SPORTS VENTURES', count: '08' },
-  { name: 'REAL SPORTS', count: '03' },
-  { name: 'VENUS PLAYERS', count: '01' },
-  { name: 'PROGRESS BAR SPORTS', count: '04' },
-];
 
-const messages = [
-  { sender: 'ALEX JANE', message: 'Sent a new message', time: '5 min ago', badge: 2 },
-  { sender: 'JORDAN', message: 'Replied to your message.', time: '7 min ago', badge: 3 },
-  { sender: 'Taylor', message: 'Sent an offer.', time: '1 day ago', badge: 1 },
-  { sender: 'Taylor', message: 'Sent an offer.', time: '1 day ago', badge: 1 },
-];
-
-const statCards = [
-  {
-    icon: <FaRunning className="text-[#9afa00] text-3xl" />, label: 'MATCHES PLAYED', value: '34',
-  },
-  {
-    icon: <FaTrophy className="text-[#9afa00] text-3xl" />, label: 'WIN RATE', value: '68%',
-  },
-  {
-    icon: <FaUserPlus className="text-[#9afa00] text-3xl" />, label: 'FOLLOWERS', value: '12.4K',
-  },
-  {
-    icon: <FaHandshake className="text-[#9afa00] text-3xl" />, label: 'BRAND DEALS', value: <><span>5</span> <span className="text-[#9afa00] text-lg font-bold ml-1">ACTIVE</span></>,
-  },
+const TABS = [
+  { label: 'Dashboard', key: 'dashboard' },
+  { label: 'AI Assistant', key: 'ai' },
 ];
 
 const Dashboard = () => {
-  return (
-    <>
-      <div className="flex flex-row items-center justify-between mb-1 bg-[#9BF9000D] px-4 md:px-16 py-4 gap-2">
-        <div className="flex flex-col">
-          <span className="text-[#9afa00] text-lg md:text-2xl font-bold border-b-0 pb-1">DASHBOARD</span>
-          <div className="h-2 mt-1" style={{ width: '120px' }}>
-            <div className="h-1 bg-[#9afa00] w-full rounded" />
-          </div>
-        </div>
-        <FaBell className="text-[#9afa00] text-xl md:text-2xl md:text-3xl" />
-      </div>
-      <div className="min-h-screen w-full bg-cover bg-center px-2 md:px-8 py-4" style={{ backgroundImage: "url('/bgApp.png')" }}>
-        {/* Greeting */}
-        <h2 className="text-white text-xl md:text-3xl font-bold mb-6 flex items-center gap-2">Hi, Pawas Aurora <span className="text-2xl">👋</span></h2>
+  const [activeTab, setActiveTab] = useState('dashboard');
 
-        {/* Stat Cards - responsive */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
-          {statCards.map((card, idx) => (
-            <div
-              key={card.label}
-              className="border border-[#9afa00] rounded-xl flex flex-col items-center min-w-0 px-4 md:px-8 py-4 md:py-6 bg-[rgba(0,0,0,0.3)]"
+  return (
+    <div className="w-full min-h-screen px-0 md:px-6 py-6">
+      {/* Tabs Row with Bell Icon */}
+      <div className="flex items-center justify-between bg-[#9BF9000D] px-2 md:px-8 py-4 rounded-b-xl overflow-x-auto whitespace-nowrap scrollbar-hide mb-6">
+        <div className="flex gap-4 md:gap-6">
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`uppercase font-bold text-white text-base md:text-lg px-2 pb-2 border-b-4 transition-all duration-200 min-w-max ${activeTab === tab.key ? 'text-[#9afa00] border-[#9afa00]' : 'border-transparent hover:text-[#9afa00]'}`}
             >
-              <div className="bg-[rgba(0,0,0,0.3)] rounded-lg flex items-center justify-center w-12 h-12 md:w-16 md:h-16 min-w-0 mb-2">
-                {card.icon}
-              </div>
-              <div className="flex flex-col items-center justify-center min-w-0 w-full">
-                <span className="text-white font-bold uppercase text-base md:text-xl tracking-wide text-center break-words w-full">{card.label}</span>
-                <span className="text-[#9afa00] font-bold text-xl md:text-3xl mt-2 text-center break-words w-full">{card.value}</span>
-              </div>
-            </div>
+              {tab.label}
+            </button>
           ))}
         </div>
-
-        {/* Main Content Grid - responsive */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Monthly Performance Overview */}
-          <div className="bg-[rgba(0,0,0,0.3)] rounded-xl p-4 md:p-6 flex flex-col min-h-[340px]">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-              <span className="text-white font-bold text-lg md:text-xl">MONTHLY PERFORMANCE OVERVIEW</span>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#9afa00] inline-block"></span> Match Played</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-300 inline-block"></span> Performance Score</span>
-              </div>
-            </div>
-            {/* Chart Placeholder */}
-            <div className="w-full h-48 flex items-end">
-              <svg width="100%" height="100%" viewBox="0 0 400 180">
-                <rect x="10" y="110" width="40" height="60" fill="#9afa00" rx="6" />
-                <rect x="70" y="80" width="40" height="90" fill="#9afa00" rx="6" />
-                <rect x="130" y="60" width="40" height="110" fill="#9afa00" rx="6" />
-                <rect x="190" y="90" width="40" height="80" fill="#9afa00" rx="6" />
-                <rect x="250" y="70" width="40" height="100" fill="#9afa00" rx="6" />
-                <rect x="310" y="50" width="40" height="120" fill="#9afa00" rx="6" />
-                <polyline points="30,120 90,100 150,80 210,110 270,70 330,60" fill="none" stroke="#fff" strokeWidth="4" />
-                <text x="20" y="175" fill="#fff" fontSize="14">Jan</text>
-                <text x="80" y="175" fill="#fff" fontSize="14">Feb</text>
-                <text x="140" y="175" fill="#fff" fontSize="14">Mar</text>
-                <text x="200" y="175" fill="#fff" fontSize="14">Apr</text>
-                <text x="260" y="175" fill="#fff" fontSize="14">May</text>
-                <text x="320" y="175" fill="#fff" fontSize="14">Jun</text>
-                <line x1="0" y1="10" x2="400" y2="10" stroke="#444" strokeWidth="1" />
-                <line x1="0" y1="50" x2="400" y2="50" stroke="#444" strokeWidth="1" />
-                <line x1="0" y1="90" x2="400" y2="90" stroke="#444" strokeWidth="1" />
-                <line x1="0" y1="130" x2="400" y2="130" stroke="#444" strokeWidth="1" />
-                <line x1="0" y1="170" x2="400" y2="170" stroke="#444" strokeWidth="1" />
-                <text x="0" y="20" fill="#fff" fontSize="14">100</text>
-                <text x="0" y="60" fill="#fff" fontSize="14">75</text>
-                <text x="0" y="100" fill="#fff" fontSize="14">50</text>
-                <text x="0" y="140" fill="#fff" fontSize="14">25</text>
-                <text x="0" y="180" fill="#fff" fontSize="14">0</text>
-              </svg>
-            </div>
-          </div>
-          {/* Achievements */}
-          <div className="bg-[rgba(0,0,0,0.3)] rounded-xl p-4 md:p-6 flex flex-col min-h-[340px]">
-            <span className="text-white font-bold text-lg md:text-xl mb-2">ACHIEVEMENTS</span>
-            <div className="flex flex-col md:flex-row gap-4 mt-4">
-              <div className="flex flex-col items-center justify-center bg-[rgba(0,0,0,0.3)] rounded-lg p-4 md:p-6 flex-1">
-                <span className="text-white font-bold mb-2">MVP 2024</span>
-                <span className="text-5xl">🏆</span>
-              </div>
-              <div className="flex flex-col items-center justify-center bg-[rgba(0,0,0,0.3)] rounded-lg p-4 md:p-6 flex-1">
-                <span className="text-white font-bold mb-2">Best Player 2025</span>
-                <span className="text-5xl">🏅</span>
-              </div>
-            </div>
-          </div>
-          {/* Match Opportunities */}
-          <div className="bg-[rgba(0,0,0,0.3)] rounded-xl p-4 md:p-6 flex flex-col min-h-[340px]">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-white font-bold text-lg md:text-xl">MATCH OPPORTUNITIES</span>
-              <button className="bg-black text-white text-xs px-3 py-1 rounded-md font-bold">6 Month</button>
-            </div>
-            <div className="flex flex-col gap-4 mt-2">
-              {matchOpportunities.map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between bg-[rgba(0,0,0,0.3)] rounded-md px-4 md:px-6 py-4">
-                  <span className="text-white text-base md:text-lg font-semibold">{item.name}</span>
-                  <span className="bg-[#9afa00] text-black font-bold rounded-full px-4 py-1 text-base md:text-lg">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* Messages */}
-          <div className="bg-[rgba(0,0,0,0.3)] rounded-xl p-4 md:p-6 flex flex-col min-h-[340px]">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-white font-bold text-lg md:text-xl">MESSAGES</span>
-              <Link to="/chats" className="bg-black text-white px-4 py-1 rounded-md font-bold hover:bg-[#9afa00] hover:text-black transition-colors">See All</Link>
-            </div>
-            <div className="flex flex-col gap-4 mt-2">
-              {messages.map((msg, idx) => (
-                <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between bg-[rgba(0,0,0,0.3)] rounded-md px-4 md:px-6 py-4 gap-2 md:gap-0">
-                  <div>
-                    <span className="text-[#9afa00] font-bold block text-base md:text-lg uppercase">{msg.sender}</span>
-                    <span className="text-white text-sm md:text-md block mt-1">{msg.message}</span>
-                  </div>
-                  <div className="flex flex-row md:flex-col items-end md:items-end gap-2 md:gap-2 justify-between md:justify-end">
-                    <span className="text-white text-xs md:text-sm">{msg.time}</span>
-                    <span className="bg-[#9afa00] text-black font-bold rounded-full px-3 py-1 text-base md:text-lg">{msg.badge}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <FaBell className="text-[#9afa00] text-xl md:text-2xl ml-4" />
       </div>
-    </>
+      {/* Tab Content */}
+      <div className="w-full">
+        {activeTab === 'dashboard' && <AthleteDashboardHome />}
+        {activeTab === 'ai' && <AthleteAiAssistant />}
+      </div>
+    </div>
   );
 };
 
