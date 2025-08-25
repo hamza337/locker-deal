@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-const Otp = () => {
+const OtpVerification = () => {
   // For auto focus, refs for each input
   const inputs = Array.from({ length: 6 }, () => useRef(null));
   const navigate = useNavigate();
@@ -59,8 +59,8 @@ const Otp = () => {
       });
       
       if (response.status === 200 || response.status === 201) {
-        toast.success('Account verified successfully, Please Login to continue');
-        navigate('/');
+        toast.success('OTP verified successfully!');
+        navigate('/reset-password', { state: { email: email, otp: otpString } });
       }
     } catch (error) {
       console.error('OTP verification error:', error);
@@ -96,19 +96,19 @@ const Otp = () => {
     }
     
     try {
-      const response = await axios.post(`${baseUrl}auth/resend-verification-otp`, {
+      const response = await axios.post(`${baseUrl}auth/resend-reset-otp`, {
         email: email
       });
       
       if (response.status === 200 || response.status === 201) {
-        toast.success('OTP resent successfully!');
+        toast.success('Reset code resent successfully!');
         // Start 60-second countdown
         setCanResend(false);
         setCountdown(60);
       }
     } catch (error) {
       console.error('Resend OTP error:', error);
-      toast.error(error.response?.data?.message || 'Failed to resend OTP. Please try again.');
+      toast.error(error.response?.data?.message || 'Failed to resend reset code. Please try again.');
     }
   };
 
@@ -116,15 +116,15 @@ const Otp = () => {
     <div className="min-h-screen w-full bg-cover bg-center flex flex-col items-center justify-center relative px-4 py-8" style={{ backgroundImage: 'url(/bgApp.png)' }}>
       {/* Top right link */}
       <Link
-        to="/login"
+        to="/"
         className="absolute top-6 sm:top-10 right-4 sm:right-8 text-[#9afa00] font-bold text-base sm:text-lg z-10"
       >
-        Already have an account?
+        Back to Login
       </Link>
       {/* Centered Logo */}
       <img src="/appLogo.png" alt="Locker Deal Logo" className="h-14 md:h-16 mt-4 mb-8 mx-auto" />
       {/* Heading */}
-      <h2 className="text-white text-2xl md:text-4xl font-bold text-center mb-4 tracking-wide">VERIFY EMAIL</h2>
+      <h2 className="text-white text-2xl md:text-4xl font-bold text-center mb-4 tracking-wide">VERIFY RESET CODE</h2>
       <p className="text-white text-md text-center mb-2">Enter the 6 digit code that was sent to</p>
       <p className="text-[#9afa00] text-md text-center mb-10 font-semibold">{email || ''}</p>
       {/* OTP Inputs */}
@@ -161,7 +161,7 @@ const Otp = () => {
             : 'bg-[#9afa00] hover:shadow-[0_0_24px_6px_#9afa00] text-black cursor-pointer'
         }`}
       >
-        {isLoading ? 'VERIFYING...' : 'VERIFY EMAIL'}
+        {isLoading ? 'VERIFYING...' : 'VERIFY CODE'}
       </button>
       {/* Resend Code */}
       <div className="text-center mt-2">
@@ -182,4 +182,4 @@ const Otp = () => {
   );
 };
 
-export default Otp;
+export default OtpVerification;

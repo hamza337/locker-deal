@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaEllipsisV, FaTimes, FaCheckCircle } from 'react-icons/fa';
+import { FaEllipsisV, FaTimes, FaCheckCircle, FaCamera, FaCrop } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
@@ -8,6 +8,15 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('brand');
+  const [profileImage, setProfileImage] = useState('https://randomuser.me/api/portraits/men/32.jpg');
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [cropData, setCropData] = useState({ x: 0, y: 0, size: 200 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const fileInputRef = useRef(null);
+  const canvasRef = useRef(null);
+  const imageRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -26,8 +35,80 @@ const Navbar = () => {
   }, [menuOpen]);
 
   const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
     setMenuOpen(false);
     navigate('/');
+  };
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedImage(e.target.result);
+        setCropModalOpen(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropSave = () => {
+    if (canvasRef.current && imageRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const img = imageRef.current;
+      
+      canvas.width = cropData.size;
+      canvas.height = cropData.size;
+      
+      ctx.drawImage(
+        img,
+        cropData.x, cropData.y, cropData.size, cropData.size,
+        0, 0, cropData.size, cropData.size
+      );
+      
+      const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setProfileImage(croppedImageUrl);
+      setCropModalOpen(false);
+      setSelectedImage(null);
+    }
+  };
+
+  const handleMouseDown = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const cropX = (cropData.x / (imageRef.current?.naturalWidth || 1)) * rect.width;
+    const cropY = (cropData.y / (imageRef.current?.naturalHeight || 1)) * rect.height;
+    const cropSize = (cropData.size / (imageRef.current?.naturalWidth || 1)) * rect.width;
+    
+    if (x >= cropX && x <= cropX + cropSize && y >= cropY && y <= cropY + cropSize) {
+      setIsDragging(true);
+      setDragStart({ x: x - cropX, y: y - cropY });
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || !imageRef.current) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - dragStart.x;
+    const y = e.clientY - rect.top - dragStart.y;
+    
+    const scaleX = imageRef.current.naturalWidth / rect.width;
+    const scaleY = imageRef.current.naturalHeight / rect.height;
+    
+    const newX = Math.max(0, Math.min(x * scaleX, imageRef.current.naturalWidth - cropData.size));
+    const newY = Math.max(0, Math.min(y * scaleY, imageRef.current.naturalHeight - cropData.size));
+    
+    setCropData(prev => ({ ...prev, x: newX, y: newY }));
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   return (
@@ -39,7 +120,7 @@ const Navbar = () => {
         {/* Profile info and avatar only on md+ */}
         <div className="hidden md:flex items-center gap-4">
           <img
-            src="https://randomuser.me/api/portraits/men/32.jpg"
+            src={profileImage}
             alt="User Avatar"
             className="h-12 w-12 md:h-16 md:w-16 rounded-full object-cover border-2 border-white"
           />
@@ -82,7 +163,23 @@ const Navbar = () => {
               </button>
               {/* Header */}
               <div className="w-full flex flex-row items-center gap-4 bg-[#23281e] rounded-t-2xl px-6 pt-6 pb-4 border-b border-[#2e3627]">
-                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Brand Avatar" className="h-14 w-14 rounded-full object-cover border-2 border-[#9afa00]" />
+                <div className="relative">
+                  <img src={profileImage} alt="Brand Avatar" className="h-14 w-14 rounded-full object-cover border-2 border-[#9afa00]" />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute -bottom-1 -right-1 bg-[#9afa00] text-black rounded-full p-1.5 hover:bg-[#baff32] transition"
+                    title="Change Profile Picture"
+                  >
+                    <FaCamera className="text-xs" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
                 <div className="flex flex-col flex-1">
                   <span className="text-white font-bold text-lg md:text-xl">PRO SPORTS VENTURES</span>
                   <span className="text-[#baff32] text-base md:text-lg">Media & Entertainment</span>
@@ -253,6 +350,112 @@ const Navbar = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        {/* Crop Modal */}
+        {cropModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm px-4">
+            <div className="relative w-full max-w-2xl bg-[#23281e] rounded-2xl shadow-lg p-6 flex flex-col animate-fadeIn">
+              {/* Close Button */}
+              <button
+                className="absolute top-4 right-4 text-[#9afa00] text-2xl hover:text-white transition z-10"
+                onClick={() => { setCropModalOpen(false); setSelectedImage(null); }}
+                aria-label="Close"
+              >
+                <FaTimes />
+              </button>
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-6">
+                <FaCrop className="text-[#9afa00] text-xl" />
+                <h2 className="text-white font-bold text-xl">Crop Profile Image</h2>
+              </div>
+              {/* Image with Crop Area */}
+              <div className="flex flex-col items-center gap-6">
+                <div className="relative bg-[#181c1a] rounded-lg p-4 max-w-lg w-full">
+                  {selectedImage && (
+                    <div 
+                      className="relative cursor-move select-none"
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={handleMouseUp}
+                    >
+                      <img
+                        ref={imageRef}
+                        src={selectedImage}
+                        alt="Selected"
+                        className="w-full h-auto max-h-96 object-contain rounded pointer-events-none"
+                        onLoad={() => {
+                          if (imageRef.current) {
+                            const img = imageRef.current;
+                            const size = Math.min(img.naturalWidth, img.naturalHeight) * 0.6;
+                            setCropData({
+                              x: (img.naturalWidth - size) / 2,
+                              y: (img.naturalHeight - size) / 2,
+                              size: size
+                            });
+                          }
+                        }}
+                        draggable={false}
+                      />
+                      {/* Crop Overlay */}
+                       <div
+                         className="absolute border-2 border-[#9afa00] cursor-move"
+                         style={{
+                           left: `${(cropData.x / (imageRef.current?.naturalWidth || 1)) * 100}%`,
+                           top: `${(cropData.y / (imageRef.current?.naturalHeight || 1)) * 100}%`,
+                           width: `${(cropData.size / (imageRef.current?.naturalWidth || 1)) * 100}%`,
+                           height: `${(cropData.size / (imageRef.current?.naturalHeight || 1)) * 100}%`,
+                           backgroundColor: 'transparent'
+                         }}
+                       >
+                         {/* Corner indicators */}
+                         <div className="absolute -top-1 -left-1 w-3 h-3 border-2 border-[#9afa00] bg-[#9afa00]" />
+                         <div className="absolute -top-1 -right-1 w-3 h-3 border-2 border-[#9afa00] bg-[#9afa00]" />
+                         <div className="absolute -bottom-1 -left-1 w-3 h-3 border-2 border-[#9afa00] bg-[#9afa00]" />
+                         <div className="absolute -bottom-1 -right-1 w-3 h-3 border-2 border-[#9afa00] bg-[#9afa00]" />
+                         {/* Center text */}
+                         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-xs bg-black bg-opacity-70 px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+                           Drag to adjust
+                         </div>
+                       </div>
+                    </div>
+                  )}
+                </div>
+                {/* Preview */}
+                <div className="flex items-center gap-4">
+                  <span className="text-white text-sm">Preview:</span>
+                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#9afa00] bg-[#232626]">
+                    {selectedImage && (
+                      <div
+                        className="w-full h-full bg-cover bg-center"
+                        style={{
+                          backgroundImage: `url(${selectedImage})`,
+                          backgroundPosition: `${-cropData.x * (64 / cropData.size)}px ${-cropData.y * (64 / cropData.size)}px`,
+                          backgroundSize: `${(imageRef.current?.naturalWidth || 1) * (64 / cropData.size)}px ${(imageRef.current?.naturalHeight || 1) * (64 / cropData.size)}px`
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Modal Actions */}
+              <div className="flex gap-4 mt-6">
+                <button
+                  className="flex-1 bg-[#232626] text-white font-bold py-2 rounded-md uppercase border border-[#9afa00] hover:bg-[#181c1a] transition"
+                  onClick={() => { setCropModalOpen(false); setSelectedImage(null); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase hover:bg-[#baff32] transition"
+                  onClick={handleCropSave}
+                >
+                  Save Image
+                </button>
+              </div>
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
             </div>
           </div>
         )}
