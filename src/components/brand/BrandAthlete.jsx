@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import toast from 'react-hot-toast';
+import { getAllAthletes } from '../../services/athleteService';
 
 const athletes = [
   {
@@ -61,10 +63,97 @@ const athletes = [
 ];
 
 const BrandAthlete = () => {
+  const [athletes, setAthletes] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('bronze');
   const [payAnnually, setPayAnnually] = useState(false);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    search: '',
+    profile: [],
+    type: [],
+    location: '',
+    page: 1,
+    limit: 10
+  });
+  
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0
+  });
+
+  // Fetch athletes on component mount and when filters change
+  useEffect(() => {
+    fetchAthletes();
+  }, [filters.page, filters.limit]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (filters.search !== undefined) {
+        setFilters(prev => ({ ...prev, page: 1 }));
+        fetchAthletes();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [filters.search]);
+
+  // Fetch athletes when other filters change
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, page: 1 }));
+    fetchAthletes();
+  }, [filters.profile, filters.type, filters.location]);
+
+  const fetchAthletes = async () => {
+    setIsLoading(true);
+    try {
+      const queryFilters = {
+        ...filters,
+        profile: filters.profile.length > 0 ? filters.profile.join(',') : undefined,
+        type: filters.type.length > 0 ? filters.type.join(',') : undefined
+      };
+      
+      const response = await getAllAthletes(queryFilters);
+      setAthletes(response.data || []);
+      setPagination(response.pagination || { page: 1, limit: 10, total: 0 });
+    } catch (error) {
+      console.error('Failed to fetch athletes:', error);
+      toast.error('Failed to load athletes');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFilterChange = (filterType, value, checked = null) => {
+    setFilters(prev => {
+      if (filterType === 'search' || filterType === 'location') {
+        return { ...prev, [filterType]: value };
+      }
+      
+      if (filterType === 'profile' || filterType === 'type') {
+        const currentArray = prev[filterType];
+        if (checked) {
+          return { ...prev, [filterType]: [...currentArray, value] };
+        } else {
+          return { ...prev, [filterType]: currentArray.filter(item => item !== value) };
+        }
+      }
+      
+      return prev;
+    });
+  };
+
+  const handlePageChange = (newPage) => {
+    setFilters(prev => ({ ...prev, page: newPage }));
+  };
+
+  const totalPages = Math.ceil(pagination.total / pagination.limit);
 
   const plans = [
     {
@@ -129,27 +218,69 @@ const BrandAthlete = () => {
             <input
               type="text"
               placeholder="Search by name"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
               className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm"
             />
+            
+            <input
+              type="text"
+              placeholder="Location"
+              value={filters.location}
+              onChange={(e) => handleFilterChange('location', e.target.value)}
+              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm"
+            />
+            
             <div className="mb-4 md:mb-6">
               <h3 className="text-[#9afa00] font-bold text-base md:text-lg mb-2 uppercase">Profile Filters</h3>
               <div className="flex flex-col gap-2 text-white">
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> College</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Professionals</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> High School</label>
+                <label className="flex items-center gap-2 text-sm md:text-base">
+                  <input 
+                    type="checkbox" 
+                    className="accent-[#9afa00]" 
+                    checked={filters.profile.includes('College')}
+                    onChange={(e) => handleFilterChange('profile', 'College', e.target.checked)}
+                  /> 
+                  College
+                </label>
+                <label className="flex items-center gap-2 text-sm md:text-base">
+                  <input 
+                    type="checkbox" 
+                    className="accent-[#9afa00]" 
+                    checked={filters.profile.includes('Professional')}
+                    onChange={(e) => handleFilterChange('profile', 'Professional', e.target.checked)}
+                  /> 
+                  Professional
+                </label>
+                <label className="flex items-center gap-2 text-sm md:text-base">
+                  <input 
+                    type="checkbox" 
+                    className="accent-[#9afa00]" 
+                    checked={filters.profile.includes('High School')}
+                    onChange={(e) => handleFilterChange('profile', 'High School', e.target.checked)}
+                  /> 
+                  High School
+                </label>
               </div>
             </div>
+            
             <div className="mb-6 md:mb-8">
               <h3 className="text-[#9afa00] font-bold text-base md:text-lg mb-2 uppercase">Type</h3>
               <div className="flex flex-col gap-2 text-white">
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Athlete</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Footballer</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Boxer</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Runner</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Swimmer</label>
-                <label className="flex items-center gap-2 text-sm md:text-base"><input type="checkbox" className="accent-[#9afa00]" /> Boxer</label>
+                {['Athlete', 'Footballer', 'Boxer', 'Runner', 'Swimmer', 'Cyclist'].map(type => (
+                  <label key={type} className="flex items-center gap-2 text-sm md:text-base">
+                    <input 
+                      type="checkbox" 
+                      className="accent-[#9afa00]" 
+                      checked={filters.type.includes(type)}
+                      onChange={(e) => handleFilterChange('type', type, e.target.checked)}
+                    /> 
+                    {type}
+                  </label>
+                ))}
               </div>
             </div>
+            
             <div className="bg-[#232626] rounded-lg p-4 flex flex-col items-center gap-2">
               <div className="flex items-center gap-2">
                 <FaLock className="text-[#9afa00] text-xl" />
@@ -160,40 +291,121 @@ const BrandAthlete = () => {
           </div>
         </div>
       </div>
+      
       {/* Athlete Cards Grid */}
       <main className="flex-1 overflow-y-auto pr-0 md:pr-1">
-        <h2 className="text-white text-xl md:text-2xl font-bold mb-4 md:mb-6 uppercase tracking-wide">Athletes</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 pb-8">
-          {athletes.map((athlete, idx) => (
-            <div key={idx} className="bg-[#232626] rounded-xl p-3 md:p-4 flex flex-col items-center shadow-md border border-transparent hover:border-[#9afa00] transition min-w-0">
-              <div className="w-full h-40 md:h-48 rounded-lg overflow-hidden mb-3 md:mb-4 bg-black flex items-center justify-center">
-                <img src={athlete.img} alt={athlete.name} className="object-cover w-full h-full" />
+        <div className="flex justify-between items-center mb-4 md:mb-6">
+          <h2 className="text-white text-xl md:text-2xl font-bold uppercase tracking-wide">Athletes</h2>
+          <div className="text-gray-400 text-sm">
+            Showing {athletes.length} of {pagination.total} athletes
+          </div>
+        </div>
+        
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="text-center py-16">
+            <div className="text-white text-xl">Loading athletes...</div>
+          </div>
+        ) : (
+          <>
+            {/* Athletes Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 pb-8">
+              {athletes.map((athlete) => (
+                <div key={athlete.id} className="bg-[#232626] rounded-xl p-3 md:p-4 flex flex-col items-center shadow-md border border-transparent hover:border-[#9afa00] transition min-w-0">
+                  <div className="w-full h-40 md:h-48 rounded-lg overflow-hidden mb-3 md:mb-4 bg-black flex items-center justify-center">
+                    {athlete.athleteProfile?.profilePicture ? (
+                      <img src={athlete.athleteProfile.profilePicture} alt={athlete.email} className="object-cover w-full h-full" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-700 flex items-center justify-center text-gray-400">
+                        No Image
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-full text-left">
+                    <div className="text-white font-bold text-base md:text-lg leading-tight">
+                      {athlete.athleteProfile?.fullName || athlete.email}
+                    </div>
+                    <div className="font-bold text-sm md:text-md text-[#9afa00]">
+                      {athlete.athleteProfile?.sport || 'Athlete'}
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-300 text-xs md:text-sm mt-1 mb-2">
+                      <svg className="w-4 h-4 text-[#9afa00]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2C6.13 2 3 5.13 3 9c0 5.25 7 9 7 9s7-3.75 7-9c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 10 6a2.5 2.5 0 0 1 0 5.5z" />
+                      </svg>
+                      {athlete.athleteProfile?.location || 'Location not specified'}
+                    </div>
+                    <div className="flex gap-2 md:gap-3 mb-3 md:mb-4">
+                      <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaTiktok className="text-[#9afa00] text-lg" /></a>
+                      <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaFacebookF className="text-[#9afa00] text-lg" /></a>
+                      <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaInstagram className="text-[#9afa00] text-lg" /></a>
+                    </div>
+                    <button 
+                      className="w-full bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-md hover:bg-[#baff32] transition"
+                      onClick={() => setShowModal(true)}
+                    >
+                      View Profile
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Empty State */}
+            {athletes.length === 0 && !isLoading && (
+              <div className="text-center py-16">
+                <div className="text-6xl text-gray-600 mx-auto mb-4">🏃‍♂️</div>
+                <h3 className="text-2xl font-bold text-white mb-2">No Athletes Found</h3>
+                <p className="text-gray-400 mb-6">Try adjusting your filters to find more athletes</p>
               </div>
-              <div className="w-full text-left">
-                <div className="text-white font-bold text-base md:text-lg leading-tight">{athlete.name}</div>
-                <div className={`font-bold text-sm md:text-md ${athlete.typeClass}`}>{athlete.type}</div>
-                <div className="flex items-center gap-2 text-gray-300 text-xs md:text-sm mt-1 mb-2">
-                  <svg className="w-4 h-4 text-[#9afa00]" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2C6.13 2 3 5.13 3 9c0 5.25 7 9 7 9s7-3.75 7-9c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 10 6a2.5 2.5 0 0 1 0 5.5z" /></svg>
-                  {athlete.location}
-                </div>
-                <div className="flex gap-2 md:gap-3 mb-3 md:mb-4">
-                  <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaTiktok className="text-[#9afa00] text-lg" /></a>
-                  <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaFacebookF className="text-[#9afa00] text-lg" /></a>
-                  <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaInstagram className="text-[#9afa00] text-lg" /></a>
-                </div>
-                <button 
-                  className="w-full bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-md hover:bg-[#baff32] transition"
-                  onClick={() => setShowModal(true)}
+            )}
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-4 mt-8 pb-8">
+                <button
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#232626] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#181c1a] transition"
                 >
-                  View Profile
+                  <FaChevronLeft /> Previous
+                </button>
+                
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = Math.max(1, pagination.page - 2) + i;
+                    if (pageNum > totalPages) return null;
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-2 rounded-md transition ${
+                          pageNum === pagination.page
+                            ? 'bg-[#9afa00] text-black font-bold'
+                            : 'bg-[#232626] text-white hover:bg-[#181c1a]'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === totalPages}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#232626] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#181c1a] transition"
+                >
+                  Next <FaChevronRight />
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+          </>
+        )}
+        
         {/* Modal Popup */}
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-40 backdrop-blur-sm px-2 md:px-0">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm px-2 md:px-0">
             <div className="relative w-full max-w-lg md:max-w-2xl bg-[#1B2317] rounded-2xl shadow-lg p-6 md:p-10 flex flex-col items-center animate-fadeIn">
               {/* Close Button */}
               <button
@@ -211,7 +423,9 @@ const BrandAthlete = () => {
                   <button
                     key={plan.key}
                     onClick={() => setSelectedPlan(plan.key)}
-                    className={`flex flex-col items-center px-4 py-3 rounded-xl border-2 transition-all duration-200 min-w-[110px] md:min-w-[180px] ${selectedPlan === plan.key ? 'border-[#9afa00] bg-[#181c1a]' : 'border-transparent bg-black bg-opacity-60'} hover:border-[#9afa00]`}
+                    className={`flex flex-col items-center px-4 py-3 rounded-xl border-2 transition-all duration-200 min-w-[110px] md:min-w-[180px] ${
+                      selectedPlan === plan.key ? 'border-[#9afa00] bg-[#181c1a]' : 'border-transparent bg-black bg-opacity-60'
+                    } hover:border-[#9afa00]`}
                   >
                     {plan.icon}
                     <span className={`mt-2 font-bold text-base md:text-lg ${selectedPlan === plan.key ? 'text-[#9afa00]' : 'text-white'}`}>{plan.label}</span>
@@ -227,33 +441,7 @@ const BrandAthlete = () => {
                     <span key={i} className="flex items-center gap-2 text-white text-xs md:text-sm"><span className="text-[#9afa00]">✔</span> {feature}</span>
                   ))}
                 </div>
-                {/* Example: extra toggle for icon plan */}
-                {selectedPlan === 'icon' && (
-                  <div className="flex items-center gap-3 mt-2 w-full">
-                    <button
-                      type="button"
-                      aria-pressed={payAnnually}
-                      onClick={() => setPayAnnually(v => !v)}
-                      className={`w-12 h-8 flex items-center rounded-full transition-colors duration-200 focus:outline-none ${payAnnually ? 'bg-[#9afa00]' : 'bg-[#181c1a]'}`}
-                    >
-                      <span
-                        className={`inline-block w-6 h-6 bg-white rounded-full shadow transform transition-transform duration-200 ${payAnnually ? 'translate-x-4' : 'translate-x-1'}`}
-                      />
-                    </button>
-                    <span className="text-white text-base md:text-lg font-normal">Pay annually and get 2 months free</span>
-                  </div>
-                )}
-                {selectedPlan === 'silver' && (
-                  <div className="w-full flex flex-col gap-2 mt-2">
-                    <div className="flex items-start gap-2 bg-black bg-opacity-60 rounded-lg p-3">
-                      <input type="checkbox" id="icon-standalone" className="accent-[#9afa00] w-4 h-4 mt-1" />
-                      <label htmlFor="icon-standalone" className="text-white text-xs md:text-sm flex flex-col">
-                        <span className="font-bold text-white text-sm md:text-base">ICON JOBS STANDS ALONE <span className="text-gray-300 font-normal">$500 per month</span></span>
-                        <span className="text-gray-300 text-xs md:text-sm">Leverage icon source platform to target, recruit & hire elite athletes to your team!</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
+                {/* ... existing plan-specific content ... */}
               </div>
               {/* Modal Actions */}
               <div className="flex w-full gap-4 mt-2">
@@ -280,4 +468,4 @@ const BrandAthlete = () => {
   );
 };
 
-export default BrandAthlete; 
+export default BrandAthlete;
