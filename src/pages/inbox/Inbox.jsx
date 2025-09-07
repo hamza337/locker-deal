@@ -1,16 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser } from 'react-icons/fa';
+import { useLocation } from 'react-router-dom';
+import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo } from 'react-icons/fa';
 import { getChatList, getChatHistory } from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { uploadFile, validateFile } from '../../services/uploadService';
 import { getChatAttachments, getSignableAttachments } from '../../services/attachmentService';
 import { createMeeting, validateMeetingData, getDefaultMeetingTimes } from '../../services/meetingService';
+import VideoCall from '../../components/chat/VideoCall';
+import videoCallService from '../../services/videoCallService';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 
 // Dynamic documents will be fetched from API
 
 const Inbox = () => {
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -38,6 +42,15 @@ const Inbox = () => {
     startTime: '',
     endTime: ''
   });
+  
+  // Video call states
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [videoCallType, setVideoCallType] = useState('outgoing'); // 'incoming', 'outgoing', 'active'
+  const [videoCallData, setVideoCallData] = useState({
+    callerName: '',
+    callerId: '',
+    channelName: ''
+  });
   const [creatingMeeting, setCreatingMeeting] = useState(false);
   const canvasRef = useRef(null);
   const documentRef = useRef(null);
@@ -64,30 +77,108 @@ const Inbox = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Fetch chat list on component mount
+  // Initialize socket and fetch chat list on component mount
   useEffect(() => {
+    // Ensure socket is connected
+    if (!socketService.isConnected) {
+      console.log('🔌 Connecting to socket service...');
+      socketService.connect();
+    }
+    
     fetchChatList();
   }, []);
-  
-  // Setup socket message listener with selectedChat dependency
-  useEffect(() => {
-    if (!selectedChat) {
-      return; // Don't set up listener if no chat is selected
-    }
 
+  // Cleanup socket listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (selectedChat) {
+        socketService.leaveRoom(selectedChat.userId);
+      }
+    };
+  }, []);
+
+  // Handle automatic chat selection when navigating from athlete card
+  useEffect(() => {
+    const handleAutoSelection = async () => {
+      if (location.state?.selectedAthleteId && chats.length >= 0 && loadingChats) {
+        console.log('🎯 Auto-selecting chat for athlete:', location.state.selectedAthleteId);
+        
+        const targetChat = chats.find(chat => chat.userId === location.state.selectedAthleteId);
+        
+        if (targetChat) {
+          console.log('✅ Found existing chat:', targetChat);
+          // Leave previous room if any
+          if (selectedChat) {
+            socketService.leaveRoom(selectedChat.userId);
+          }
+          
+          setSelectedChat(targetChat);
+          
+          // Fetch chat history
+          try {
+            await fetchChatHistory(targetChat.userId);
+            // Join the new chat room
+            const joinSuccess = await socketService.joinRoom(targetChat.userId);
+            if (joinSuccess) {
+              toast.success(`Opened chat with ${location.state.selectedAthleteName || 'athlete'}`);
+            } else {
+              toast.error('Failed to join chat room');
+            }
+          } catch (error) {
+            console.error('Failed to load chat history:', error);
+            toast.error('Failed to load chat history');
+          }
+        } else {
+          console.log('📝 Creating new chat for athlete:', location.state.selectedAthleteId);
+          // If chat doesn't exist, create a new chat entry
+          const newChat = {
+            userId: location.state.selectedAthleteId,
+            avatar: `https://randomuser.me/api/portraits/men/1.jpg`,
+            name: location.state.selectedAthleteName || 'Athlete',
+            message: 'Start a conversation...',
+            time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            badge: 0
+          };
+          
+          setChats(prev => [newChat, ...prev]);
+          setSelectedChat(newChat);
+          setMessages([]); // Clear messages for new chat
+          
+          // Join the new chat room
+          const joinSuccess = await socketService.joinRoom(newChat.userId);
+          if (joinSuccess) {
+            toast.success(`Started new chat with ${location.state.selectedAthleteName || 'athlete'}`);
+          } else {
+            toast.error('Failed to join new chat room');
+          }
+        }
+        
+        setSidebarOpen(false); // Close sidebar on mobile after selection
+        
+        // Clear the navigation state to prevent re-triggering
+        window.history.replaceState({}, document.title);
+      }
+    };
+    
+    handleAutoSelection();
+  }, [chats, location.state, loadingChats]);
+  
+  // Setup global socket message listener (always active)
+  useEffect(() => {
     const handleMessage = (message) => {
       console.log('📨 Received new message:', message);
       console.log('📨 Current selectedChat:', selectedChat);
       
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
-      // Only process messages that belong to the currently selected chat
-      const isMessageForCurrentChat = 
+      // Check if message belongs to the currently selected chat
+      const isMessageForCurrentChat = selectedChat && (
         (message.sender.id === selectedChat.userId && message.receiver.id === user.id) ||
-        (message.sender.id === user.id && message.receiver.id === selectedChat.userId);
+        (message.sender.id === user.id && message.receiver.id === selectedChat.userId)
+      );
       
       if (isMessageForCurrentChat) {
-        // Only add messages from other users to avoid duplicates (we already add our own messages optimistically)
+        // Add message to current chat if it's from another user (avoid duplicates)
         if (message.sender.id !== user.id) {
           const newMessage = {
             id: message.id || Date.now(),
@@ -104,21 +195,176 @@ const Inbox = () => {
           toast.success('New message received!');
         }
       } else {
-        // Show notification for messages from other chats (but don't add to current chat)
+        // Handle messages from other chats (global notifications)
         if (message.sender.id !== user.id) {
-          console.log('📨 Message from other chat, showing notification only');
-          toast.success('New message from another chat');
+          console.log('📨 Message from other chat, showing global notification');
+          
+          // Find sender info from chat list for better notification
+          const senderChat = chats.find(chat => chat.userId === message.sender.id);
+          const senderName = senderChat?.name || message.sender.email || 'Someone';
+          
+          toast.success(`New message from ${senderName}`, {
+            duration: 4000,
+            icon: '💬',
+          });
         }
       }
     };
 
+    // Handle chat list updates from socket
+    const handleChatListUpdate = (updatedChatList) => {
+      console.log('📋 Received chat list update:', updatedChatList);
+      
+      // Transform API data to match component structure (same as fetchChatList)
+      const transformedChats = updatedChatList.map((chat, index) => ({
+        userId: chat.user.id,
+        avatar: `https://randomuser.me/api/portraits/men/${(index % 8) + 1}.jpg`,
+        name: chat.user.email,
+        message: chat.lastMessage,
+        time: chat.lastMessageTime ? new Date(chat.lastMessageTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '12:25',
+        badge: chat.unreadCount
+      }));
+      
+      setChats(transformedChats);
+      console.log('✅ Chat list updated automatically');
+    };
+
     const unsubscribeMessages = socketService.onMessage(handleMessage);
     
-    // Cleanup socket listeners on unmount or selectedChat change
+    // Subscribe to chat list updates
+    const unsubscribeChatList = socketService.onChatListUpdate(handleChatListUpdate);
+    
+    // Video call event listeners
+    const handleIncomingCall = (callData) => {
+      console.log('📞 Incoming video call received:', callData);
+      console.log('📞 Current user:', JSON.parse(localStorage.getItem('user') || '{}'));
+      console.log('📞 Socket connected:', socketService.socket?.connected);
+      console.log('📞 Current showVideoCall state:', showVideoCall);
+      
+      setVideoCallData({
+        callerName: callData.callerName || 'Unknown User',
+        callerId: callData.callerId,
+        channelName: callData.channelName
+      });
+      setVideoCallType('incoming');
+      setShowVideoCall(true);
+      
+      console.log('📞 Updated video call state - showing modal');
+      toast.success(`Incoming video call from ${callData.callerName}`);
+    };
+
+    const handleCallRejected = (callData) => {
+      console.log('📞 Video call rejected:', callData);
+      setShowVideoCall(false);
+      toast.error('Call was rejected');
+    };
+
+    // Set up video call socket listeners
+    if (socketService.socket) {
+      console.log('🔌 Setting up video call socket listeners');
+      socketService.socket.on('video_call_invite', handleIncomingCall);
+      socketService.socket.on('video_call_reject', handleCallRejected);
+      
+      // Add a test listener to verify socket events are working
+      socketService.socket.on('test_event', (data) => {
+        console.log('🧪 Test event received:', data);
+        toast.success('Test event received!');
+      });
+    } else {
+      console.warn('⚠️ Socket not available when setting up video call listeners');
+    }
+    
+    // Cleanup socket listeners on unmount
     return () => {
       if (unsubscribeMessages) {
         unsubscribeMessages();
       }
+      if (unsubscribeChatList) {
+        unsubscribeChatList();
+      }
+      
+      // Clean up video call listeners
+      if (socketService.socket) {
+        socketService.socket.off('video_call_invite', handleIncomingCall);
+        socketService.socket.off('video_call_reject', handleCallRejected);
+        socketService.socket.off('test_event');
+      }
+    };
+  }, [selectedChat, chats]); // Include chats in dependency for sender name lookup
+
+  // Debug function for testing video calls (accessible from browser console)
+  useEffect(() => {
+    window.debugVideoCall = {
+      testSocket: () => {
+        console.log('🧪 Testing socket connection...');
+        console.log('Socket connected:', socketService.socket?.connected);
+        console.log('Socket ID:', socketService.socket?.id);
+        console.log('Socket URL:', socketService.baseUrl);
+        if (socketService.socket) {
+          socketService.socket.emit('test_event', { message: 'Test from browser console' });
+        }
+      },
+      testVideoCallInvite: (receiverId) => {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const testData = {
+          callerId: user.id,
+          callerName: user.email || 'Test User',
+          receiverId: receiverId || 'test_receiver',
+          channelName: 'test_channel_123'
+        };
+        console.log('🧪 Sending test video call invite:', testData);
+        socketService.socket?.emit('video_call_invite', testData);
+      },
+      getCurrentUser: () => {
+        return JSON.parse(localStorage.getItem('user') || '{}');
+      },
+      getSelectedChat: () => {
+        return selectedChat;
+      },
+      checkSocketListeners: () => {
+        console.log('🔍 Checking socket event listeners...');
+        console.log('Socket events:', socketService.socket?.eventNames());
+        console.log('Video call listeners active:', !!socketService.socket?.listeners('video_call_invite').length);
+      },
+      simulateIncomingCall: () => {
+         const testCallData = {
+           callerId: 'test-caller-id',
+           callerName: 'Test Caller',
+           receiverId: JSON.parse(localStorage.getItem('user') || '{}').id,
+           channelName: 'test_channel_simulation'
+         };
+         console.log('🧪 Simulating incoming call:', testCallData);
+         // Directly trigger the handleIncomingCall function
+         if (socketService.socket) {
+           socketService.socket.emit('video_call_invite', testCallData);
+         }
+       },
+       directTriggerIncomingCall: () => {
+         const testCallData = {
+           callerId: 'direct-test-caller',
+           callerName: 'Direct Test Caller',
+           receiverId: JSON.parse(localStorage.getItem('user') || '{}').id,
+           channelName: 'direct_test_channel'
+         };
+         console.log('🧪 Directly triggering incoming call handler:', testCallData);
+         // Find and directly call the handleIncomingCall function
+         const handleIncomingCall = (callData) => {
+           console.log('📞 Direct incoming call triggered:', callData);
+           setVideoCallData({
+             callerName: callData.callerName || 'Unknown User',
+             callerId: callData.callerId,
+             channelName: callData.channelName
+           });
+           setVideoCallType('incoming');
+           setShowVideoCall(true);
+           toast.success(`Direct test call from ${callData.callerName}`);
+         };
+         handleIncomingCall(testCallData);
+       }
+    };
+    
+    return () => {
+      delete window.debugVideoCall;
     };
   }, [selectedChat]);
 
@@ -191,19 +437,39 @@ const Inbox = () => {
   };
 
   // Handle chat selection
-  const handleChatSelect = (chat) => {
-    // Leave previous room if any
-    if (selectedChat) {
-      socketService.leaveRoom(selectedChat.userId);
+  const handleChatSelect = async (chat) => {
+    try {
+      console.log('💬 Selecting chat:', chat);
+      
+      // Leave previous room if any
+      if (selectedChat) {
+        console.log('🚪 Leaving previous room:', selectedChat.userId);
+        socketService.leaveRoom(selectedChat.userId);
+      }
+      
+      setSelectedChat(chat);
+      
+      // Fetch chat history
+      console.log('📚 Fetching chat history for:', chat.userId);
+      await fetchChatHistory(chat.userId);
+      
+      // Join the new chat room
+      console.log('🚪 Joining new room:', chat.userId);
+      const joinSuccess = await socketService.joinRoom(chat.userId);
+      
+      if (!joinSuccess) {
+        console.warn('⚠️ Failed to join chat room');
+        toast.error('Failed to join chat room');
+      } else {
+        console.log('✅ Successfully joined chat room');
+      }
+      
+      setSidebarOpen(false); // Close sidebar on mobile after selection
+      
+    } catch (error) {
+      console.error('❌ Error selecting chat:', error);
+      toast.error('Failed to open chat');
     }
-    
-    setSelectedChat(chat);
-    fetchChatHistory(chat.userId);
-    
-    // Join the new chat room
-    socketService.joinRoom(chat.userId);
-    
-    setSidebarOpen(false); // Close sidebar on mobile after selection
   };
 
   // Send message function
@@ -699,6 +965,87 @@ const Inbox = () => {
     setCreatingMeeting(false);
   };
 
+  // Video call functions
+  const startVideoCall = async () => {
+    if (!selectedChat) {
+      toast.error('Please select a chat first');
+      return;
+    }
+
+    try {
+      // Generate a unique channel name based on user IDs (Agora: max 64 bytes, a-z,A-Z,0-9,!,#,$,%,&,(,),+,-,:,;,<,=,.,>,?,@,[,],^,_,{,},|,~, )
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId1 = String(user.id).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      const userId2 = String(selectedChat.userId).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      const channelName = `call_${userId1}_${userId2}`.substring(0, 63);
+      
+      console.log('🎥 Starting video call:', {
+        caller: user,
+        receiver: selectedChat,
+        channelName,
+        socketConnected: socketService.socket?.connected
+      });
+      
+      setVideoCallData({
+        callerName: selectedChat.name,
+        callerId: selectedChat.userId,
+        channelName: channelName
+      });
+      setVideoCallType('outgoing');
+      setShowVideoCall(true);
+      
+      // Initialize and join the call
+      const success = await videoCallService.joinCall(channelName);
+      if (success) {
+        setVideoCallType('active');
+        // Emit call invitation through socket
+        const callData = {
+          callerId: user.id,
+          callerName: user.email || user.name || 'User',
+          receiverId: selectedChat.userId,
+          channelName: channelName
+        };
+        
+        console.log('📤 Emitting video_call_invite:', callData);
+        socketService.socket?.emit('video_call_invite', callData);
+        toast.success('Video call started!');
+      } else {
+        setShowVideoCall(false);
+        toast.error('Failed to start video call');
+      }
+    } catch (error) {
+      console.error('❌ Failed to start video call:', error);
+      setShowVideoCall(false);
+      toast.error('Failed to start video call');
+    }
+  };
+
+  const handleVideoCallAccept = () => {
+    setVideoCallType('active');
+    toast.success('Call accepted!');
+  };
+
+  const handleVideoCallReject = () => {
+    setShowVideoCall(false);
+    // Emit call rejection through socket
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    socketService.socket?.emit('video_call_reject', {
+      callerId: videoCallData.callerId,
+      receiverId: user.id
+    });
+    toast.success('Call rejected');
+  };
+
+  const handleVideoCallEnd = () => {
+    setShowVideoCall(false);
+    setVideoCallType('outgoing');
+    setVideoCallData({
+      callerName: '',
+      callerId: '',
+      channelName: ''
+    });
+  };
+
   const handleMeetingInputChange = (field, value) => {
     setMeetingData(prev => ({
       ...prev,
@@ -864,6 +1211,15 @@ const Inbox = () => {
               )}
             </div>
             <div className="flex items-center gap-3">
+              {selectedChat && (
+                <button 
+                  onClick={startVideoCall}
+                  className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20"
+                  title="Start Video Call"
+                >
+                  <FaVideo className="text-[#9afa00] text-lg" />
+                </button>
+              )}
               <button className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20">
                 <FaSearch className="text-[#9afa00] text-lg" />
               </button>
@@ -1593,6 +1949,18 @@ const Inbox = () => {
           </div>
         </div>
       )}
+      
+      {/* Video Call Modal */}
+      <VideoCall
+        isOpen={showVideoCall}
+        onClose={handleVideoCallEnd}
+        callType={videoCallType}
+        callerName={videoCallData.callerName}
+        callerId={videoCallData.callerId}
+        channelName={videoCallData.channelName}
+        onAccept={handleVideoCallAccept}
+        onReject={handleVideoCallReject}
+      />
     </div>
   );
 };

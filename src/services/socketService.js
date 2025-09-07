@@ -10,6 +10,7 @@ class SocketService {
     this.baseUrl = import.meta.env.VITE_API_BASE_URL;
     this.connectionListeners = [];
     this.messageListeners = [];
+    this.chatListUpdateListeners = [];
     this.currentRoom = null;
     this.joinedRooms = new Set();
   }
@@ -113,6 +114,13 @@ class SocketService {
       this.messageListeners.forEach(callback => callback(message));
     });
 
+    // Listen for chat list updates
+    this.socket.on('chat_list_update', (chatList) => {
+      console.log('📋 Received chat list update:', chatList);
+      // Notify all chat list update listeners
+      this.chatListUpdateListeners.forEach(callback => callback(chatList));
+    });
+
     // Room and user events
     this.socket.on('room_joined', (data) => {
       console.log('✅ Joined room:', data);
@@ -133,6 +141,20 @@ class SocketService {
     // Listen for any unhandled events (debugging)
     this.socket.onAny((eventName, ...args) => {
       console.log(`🔍 Received event '${eventName}':`, args);
+      
+      // Special handling for video call events
+      if (eventName === 'video_call_invite') {
+        console.log('📞 Video call invite detected in onAny listener:', args[0]);
+      }
+    });
+    
+    // Add explicit video call event listeners for debugging
+    this.socket.on('video_call_invite', (data) => {
+      console.log('📞 Direct video_call_invite listener triggered:', data);
+    });
+    
+    this.socket.on('video_call_reject', (data) => {
+      console.log('📞 Direct video_call_reject listener triggered:', data);
     });
   }
 
@@ -231,22 +253,30 @@ class SocketService {
 
     console.log('🚪 Joining room with user:', otherUserId);
     
-    // Emit join event
-    this.socket.emit('join', roomData, (response) => {
-      console.log('🚪 Join room response:', response);
+    // Return a promise to handle async response
+    return new Promise((resolve) => {
+      // Emit join event
+      this.socket.emit('join', roomData, (response) => {
+        console.log('🚪 Join room response:', response);
+        
+        if (response && (response.success || response.status === 'success' || response.status === 'joined')) {
+          this.currentRoom = otherUserId;
+          this.joinedRooms.add(otherUserId);
+          console.log('✅ Successfully joined room with:', otherUserId);
+          resolve(true);
+        } else {
+          console.error('❌ Failed to join room:', response);
+          toast.error('Failed to join chat room');
+          resolve(false);
+        }
+      });
       
-      if (response && (response.success || response.status === 'success' || response.status === 'joined')) {
-        this.currentRoom = otherUserId;
-        this.joinedRooms.add(otherUserId);
-        console.log('✅ Successfully joined room with:', otherUserId);
-        toast.success('Joined chat room!');
-      } else {
-        console.error('❌ Failed to join room:', response);
-        toast.error('Failed to join chat room');
-      }
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        console.warn('⏰ Join room timeout for user:', otherUserId);
+        resolve(false);
+      }, 5000);
     });
-
-    return true;
   }
 
   // Leave current room
@@ -297,6 +327,16 @@ class SocketService {
     // Return unsubscribe function
     return () => {
       this.messageListeners = this.messageListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  // Subscribe to chat list updates
+  onChatListUpdate(callback) {
+    this.chatListUpdateListeners.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this.chatListUpdateListeners = this.chatListUpdateListeners.filter(cb => cb !== callback);
     };
   }
 

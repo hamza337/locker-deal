@@ -1,0 +1,20 @@
+{
+  "name": "video-call-test-server",
+  "version": "1.0.0",
+  "description": "Simple test server for video call socket events",
+  "main": "simple-video-call-server.js",
+  "scripts": {
+    "start": "node simple-video-call-server.js",
+    "dev": "nodemon simple-video-call-server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["socket.io", "video-call", "test-server"],
+  "author": "Video Call Test",
+  "license": "MIT"
+}

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes, FaChevronLeft, FaChevronRight, FaCommentDots } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getAllAthletes } from '../../services/athleteService';
+import socketService from '../../services/socketService';
 
 const athletes = [
   {
@@ -63,6 +65,7 @@ const athletes = [
 ];
 
 const BrandAthlete = () => {
+  const navigate = useNavigate();
   const [athletes, setAthletes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -311,36 +314,73 @@ const BrandAthlete = () => {
             {/* Athletes Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 pb-8">
               {athletes.map((athlete) => (
-                <div key={athlete.id} className="bg-[#232626] rounded-xl p-3 md:p-4 flex flex-col items-center shadow-md border border-transparent hover:border-[#9afa00] transition min-w-0">
+                <div key={athlete.id} className="bg-[#232626] rounded-xl p-3 md:p-4 flex flex-col shadow-md border border-transparent hover:border-[#9afa00] transition min-w-0 relative">
+                  {/* Chat Icon - Top Right */}
+                  <button 
+                    className="absolute top-3 right-3 bg-[#9afa00] hover:bg-[#baff32] p-2 rounded-full transition-all duration-200 z-10 shadow-lg"
+                    onClick={() => {
+                      // Navigate to chats with athlete info
+                      navigate('/chats', { state: { selectedAthleteId: athlete.id, selectedAthleteName: athlete.athleteProfile?.fullName || athlete.email } });
+                      toast.success('Opening chat with athlete...');
+                    }}
+                    title="Start Chat"
+                  >
+                    <FaCommentDots className="text-black text-sm" />
+                  </button>
+                  
+                  {/* Profile Image */}
                   <div className="w-full h-40 md:h-48 rounded-lg overflow-hidden mb-3 md:mb-4 bg-black flex items-center justify-center">
                     {athlete.athleteProfile?.profilePicture ? (
-                      <img src={athlete.athleteProfile.profilePicture} alt={athlete.email} className="object-cover w-full h-full" />
+                      <img src={athlete.athleteProfile.profilePicture} alt={athlete.athleteProfile?.fullName || 'Athlete'} className="object-cover w-full h-full" />
                     ) : (
                       <div className="w-full h-full bg-gray-700 flex items-center justify-center text-gray-400">
                         No Image
                       </div>
                     )}
                   </div>
-                  <div className="w-full text-left">
-                    <div className="text-white font-bold text-base md:text-lg leading-tight">
-                      {athlete.athleteProfile?.fullName || athlete.email}
+                  
+                  {/* Athlete Info */}
+                  <div className="w-full text-left flex-1">
+                    {/* Name/Email with proper truncation */}
+                    <div className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                      {athlete.athleteProfile?.fullName ? (
+                        <span className="block truncate">{athlete.athleteProfile.fullName}</span>
+                      ) : (
+                        <span className="block truncate text-sm" title={athlete.email}>
+                          {athlete.email.length > 20 ? `${athlete.email.substring(0, 20)}...` : athlete.email}
+                        </span>
+                      )}
                     </div>
-                    <div className="font-bold text-sm md:text-md text-[#9afa00]">
+                    
+                    {/* Sport */}
+                    <div className="font-bold text-sm md:text-md text-[#9afa00] mb-2">
                       {athlete.athleteProfile?.sport || 'Athlete'}
                     </div>
-                    <div className="flex items-center gap-2 text-gray-300 text-xs md:text-sm mt-1 mb-2">
-                      <svg className="w-4 h-4 text-[#9afa00]" fill="currentColor" viewBox="0 0 20 20">
+                    
+                    {/* Location */}
+                    <div className="flex items-center gap-2 text-gray-300 text-xs md:text-sm mb-3">
+                      <svg className="w-4 h-4 text-[#9afa00] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 2C6.13 2 3 5.13 3 9c0 5.25 7 9 7 9s7-3.75 7-9c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 10 6a2.5 2.5 0 0 1 0 5.5z" />
                       </svg>
-                      {athlete.athleteProfile?.location || 'Location not specified'}
+                      <span className="truncate">{athlete.athleteProfile?.location || 'Location not specified'}</span>
                     </div>
-                    <div className="flex gap-2 md:gap-3 mb-3 md:mb-4">
-                      <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaTiktok className="text-[#9afa00] text-lg" /></a>
-                      <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaFacebookF className="text-[#9afa00] text-lg" /></a>
-                      <a href="#" className="bg-[#181c1a] p-2 rounded-full"><FaInstagram className="text-[#9afa00] text-lg" /></a>
+                    
+                    {/* Social Media Icons */}
+                    <div className="flex gap-2 md:gap-3 mb-3 md:mb-4 justify-center">
+                      <a href="#" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-2 rounded-full transition-all duration-200" title="TikTok">
+                        <FaTiktok className="text-[#9afa00] hover:text-black text-base transition-colors" />
+                      </a>
+                      <a href="#" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-2 rounded-full transition-all duration-200" title="Facebook">
+                        <FaFacebookF className="text-[#9afa00] hover:text-black text-base transition-colors" />
+                      </a>
+                      <a href="#" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-2 rounded-full transition-all duration-200" title="Instagram">
+                        <FaInstagram className="text-[#9afa00] hover:text-black text-base transition-colors" />
+                      </a>
                     </div>
+                    
+                    {/* View Profile Button */}
                     <button 
-                      className="w-full bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-md hover:bg-[#baff32] transition"
+                      className="w-full bg-[#9afa00] text-black font-bold py-2.5 rounded-md uppercase text-xs md:text-sm hover:bg-[#baff32] transition-all duration-200 shadow-md hover:shadow-lg"
                       onClick={() => setShowModal(true)}
                     >
                       View Profile

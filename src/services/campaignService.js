@@ -26,7 +26,8 @@ export const createCampaign = async (campaignData) => {
         title: campaignData.title,
         description: campaignData.description,
         budget: campaignData.budget,
-        isAnonymous: true // Default to true as per API spec
+        targetSport: campaignData.targetSport,
+        isAnonymous: campaignData.isAnonymous || false // Default to false
       },
       {
         headers: createAuthHeaders()
@@ -44,7 +45,7 @@ export const createCampaign = async (campaignData) => {
 export const getAllCampaigns = async () => {
   try {
     const response = await axios.get(
-      `${baseUrl}campaigns`,
+      `${baseUrl}campaigns/my-campaigns`,
       {
         headers: createAuthHeaders()
       }

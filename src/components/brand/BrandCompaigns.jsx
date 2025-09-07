@@ -22,12 +22,16 @@ const BrandCompaigns = () => {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     budget: '',
     sport: '',
-    status: ''
+    status: '',
+    isAnonymous: false
   });
 
   // Fetch campaigns on component mount
@@ -49,7 +53,7 @@ const BrandCompaigns = () => {
 
   const handleCreateCampaign = () => {
     setModalMode('create');
-    setFormData({ title: '', description: '', budget: '', sport: '', status: CAMPAIGN_STATUSES.OPEN });
+    setFormData({ title: '', description: '', budget: '', sport: '', status: CAMPAIGN_STATUSES.OPEN, isAnonymous: false });
     setIsModalOpen(true);
   };
 
@@ -60,8 +64,9 @@ const BrandCompaigns = () => {
       title: campaign.title,
       description: campaign.description,
       budget: campaign.budget,
-      sport: campaign.sport || '',
-      status: campaign.status
+      sport: campaign.sport || campaign.targetSport || '',
+      status: campaign.status,
+      isAnonymous: campaign.isAnonymous || false
     });
     setIsModalOpen(true);
   };
@@ -72,17 +77,32 @@ const BrandCompaigns = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteCampaign = async (campaignId) => {
-    if (window.confirm('Are you sure you want to delete this campaign?')) {
+  const handleDeleteCampaign = (campaignId) => {
+    setCampaignToDelete(campaignId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeleteCampaign = async () => {
+    if (campaignToDelete) {
+      setIsDeleting(true);
       try {
-        await deleteCampaign(campaignId);
+        await deleteCampaign(campaignToDelete);
         toast.success('Campaign deleted successfully!');
         // Refresh campaigns list
         fetchCampaigns();
       } catch (error) {
         console.error('Failed to delete campaign:', error);
+      } finally {
+        setIsDeleting(false);
+        setIsDeleteModalOpen(false);
+        setCampaignToDelete(null);
       }
     }
+  };
+
+  const cancelDeleteCampaign = () => {
+    setIsDeleteModalOpen(false);
+    setCampaignToDelete(null);
   };
 
   const handleSubmit = async (e) => {
@@ -94,7 +114,9 @@ const BrandCompaigns = () => {
         await createCampaign({
           title: formData.title,
           description: formData.description,
-          budget: formData.budget
+          budget: formData.budget,
+          targetSport: formData.sport,
+          isAnonymous: formData.isAnonymous
         });
         toast.success('Campaign created successfully!');
         // Refresh campaigns list
@@ -111,8 +133,14 @@ const BrandCompaigns = () => {
         if (formData.budget !== selectedCampaign.budget) {
           updateData.budget = formData.budget;
         }
+        if (formData.sport !== (selectedCampaign.sport || selectedCampaign.targetSport || '')) {
+          updateData.targetSport = formData.sport;
+        }
         if (formData.status !== selectedCampaign.status) {
           updateData.status = formData.status;
+        }
+        if (formData.isAnonymous !== (selectedCampaign.isAnonymous || false)) {
+          updateData.isAnonymous = formData.isAnonymous;
         }
         
         // Only make API call if there are changes
@@ -167,7 +195,10 @@ const BrandCompaigns = () => {
       {/* Loading State */}
       {isLoading ? (
         <div className="text-center py-16">
-          <div className="text-white text-xl">Loading campaigns...</div>
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-[#9afa00]"></div>
+            <div className="text-white text-xl">Loading campaigns...</div>
+          </div>
         </div>
       ) : (
         <>
@@ -224,7 +255,7 @@ const BrandCompaigns = () => {
                 {/* Campaign Details */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-[#9afa00]">
-                    <FaDollarSign className="text-sm" />
+                    {/* <FaDollarSign className="text-sm" /> */}
                     <span className="font-semibold">{formatBudget(campaign.budget)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-400">
@@ -255,7 +286,7 @@ const BrandCompaigns = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-opacity-40 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-gradient-to-br from-[#1a2f14] to-[#0f1a0c] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-[#9afa00]/30">
             {/* Modal Header */}
             <div className="flex justify-between items-center mb-6">
@@ -289,9 +320,16 @@ const BrandCompaigns = () => {
                     <p className="text-white text-lg font-bold">{formatBudget(selectedCampaign?.budget)}</p>
                   </div>
                   <div>
+                    <label className="block text-[#9afa00] font-semibold mb-2">Target Sport</label>
+                    <p className="text-white">{selectedCampaign?.sport || selectedCampaign?.targetSport || 'Not specified'}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-[#9afa00] font-semibold mb-2">Anonymous</label>
                     <p className="text-white">{selectedCampaign?.isAnonymous ? 'Yes' : 'No'}</p>
                   </div>
+                  <div></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -352,7 +390,7 @@ const BrandCompaigns = () => {
                     <label className="block text-[#9afa00] font-semibold mb-2">Target Sport</label>
                     <input
                       type="text"
-                      value={formData.sport}
+                      value={formData.targetSport || formData.sport}
                       onChange={(e) => setFormData({ ...formData, sport: e.target.value })}
                       className="w-full bg-[rgba(0,0,0,0.5)] text-white border border-[#9afa00]/30 rounded-lg px-4 py-3 focus:outline-none focus:border-[#9afa00] transition-colors"
                       placeholder="e.g., Basketball"
@@ -374,6 +412,19 @@ const BrandCompaigns = () => {
                     </select>
                   </div>
                 )}
+                {/* Anonymous posting checkbox */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isAnonymous"
+                    checked={formData.isAnonymous}
+                    onChange={(e) => setFormData({ ...formData, isAnonymous: e.target.checked })}
+                    className="w-5 h-5 text-[#9afa00] bg-[rgba(0,0,0,0.5)] border border-[#9afa00]/30 rounded focus:ring-[#9afa00] focus:ring-2"
+                  />
+                  <label htmlFor="isAnonymous" className="text-white font-medium cursor-pointer">
+                    Post campaign anonymously
+                  </label>
+                </div>
                 <div className="flex gap-4 pt-4">
                   <button
                     type="button"
@@ -399,6 +450,55 @@ const BrandCompaigns = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-opacity-40 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-[#1a2f14] to-[#0f1a0c] rounded-2xl p-6 w-full max-w-md border border-red-500/30">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white">Confirm Delete</h2>
+              <button
+                onClick={cancelDeleteCampaign}
+                className="text-gray-400 hover:text-white text-2xl transition-colors"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="mb-6">
+              <p className="text-white text-center mb-4">
+                Are you sure you want to delete this campaign?
+              </p>
+              <p className="text-red-400 text-sm text-center">
+                This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex gap-4">
+              <button
+                onClick={cancelDeleteCampaign}
+                className="flex-1 py-3 px-6 rounded-lg bg-gray-600 text-white font-bold hover:bg-gray-700 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteCampaign}
+                disabled={isDeleting}
+                className={`flex-1 py-3 px-6 rounded-lg font-bold transition-all duration-200 ${
+                  isDeleting 
+                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}
