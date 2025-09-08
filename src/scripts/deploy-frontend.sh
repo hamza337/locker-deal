@@ -1,6 +1,6 @@
 #!/bin/bash
 
-APP_NAME="locker-frontend"
+APP_NAME="locker-deal"
 APP_BASE="$HOME"
 APP_DIR="$APP_BASE/$APP_NAME"
 REPO_URL="https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${GIT_USERNAME}/$APP_NAME.git"
