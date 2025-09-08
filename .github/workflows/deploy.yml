@@ -40,7 +40,7 @@ jobs:
             else
               echo 'Cloning fresh repo...'
               rm -rf \$APP_DIR
-              git clone https://hamza337:${{ secrets.GIT_TOKEN }}@github.com/hamza337/locker-deal.git \$APP_DIR
+              git clone https://$GIT_TOKEN@github.com/hamza337/locker-deal.git $APP_DIR
             fi
 
             echo 'Running deploy script...'
