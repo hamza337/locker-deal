@@ -58,13 +58,20 @@ npm install || { echo "❌ npm install failed"; exit 1; }
 echo "🛠 Building React app..."
 npm run build || { echo "❌ Build failed"; exit 1; }
 
-# Check build output
-if [ ! -d build ]; then
-    echo "❌ Build directory not found!"
+# Go back to app root to check build output
+cd $APP_DIR
+
+# Detect Vite (dist) or CRA (build) output
+if [ -d "$APP_DIR/dist" ]; then
+    BUILD_DIR="$APP_DIR/dist"
+elif [ -d "$APP_DIR/build" ]; then
+    BUILD_DIR="$APP_DIR/build"
+else
+    echo "❌ Build directory not found (expected dist/ or build/)"
     exit 1
 fi
 
-echo "🔁 Restarting frontend with PM2..."
+echo "🔁 Restarting frontend with PM2 (serving $BUILD_DIR)..."
 
 # Start or restart PM2 serve process
 if pm2 list | grep -q "$APP_NAME"; then
@@ -72,8 +79,9 @@ if pm2 list | grep -q "$APP_NAME"; then
     pm2 restart $APP_NAME
 else
     echo "🚀 Starting new PM2 serve process..."
-    pm2 start "serve -s build -l 3000" --name $APP_NAME
+    pm2 start "serve -s $BUILD_DIR -l 3000" --name $APP_NAME
 fi
+
 
 pm2 save
 
