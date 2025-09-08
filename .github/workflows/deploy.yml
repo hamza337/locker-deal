@@ -1,0 +1,49 @@
+name:  Deploy to Contabo (Password Login)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name:  Install sshpass
+        run: sudo apt-get install -y sshpass
+
+      - name:  SSH using password and run deploy script
+        env:
+          HOST: ${{ secrets.CONTABO_HOST }}
+          USER: ${{ secrets.CONTABO_USER }}
+          PASS: ${{ secrets.CONTABO_PASS }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+        run: |
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST "
+            echo 'Setting up environment...'
+
+            export APP_DIR=\$HOME/lockerai-frontend
+
+            cd ~
+            echo 'Checking if repo exists and is valid...'
+
+            if [ -d \"\$APP_DIR/.git\" ]; then
+              echo 'Pulling latest changes...'
+              cd \$APP_DIR
+              git reset --hard
+              git fetch origin
+              git checkout main
+              git pull origin main
+            else
+              echo 'Cloning fresh repo...'
+              rm -rf \$APP_DIR
+              git clone https://hamza337:${{ secrets.GIT_TOKEN }}@github.com/hamza337/locker-deal.git \$APP_DIR
+            fi
+
+            echo 'Running deploy script...'
+            chmod +x \$APP_DIR/src/scripts/deploy-frontend.sh
+            \$APP_DIR/src/scripts/deploy-frontend.sh
+          "
