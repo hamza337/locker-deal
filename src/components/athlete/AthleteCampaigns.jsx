@@ -1,131 +1,42 @@
-import React, { useState } from 'react';
-import { FaTimes, FaCalendarAlt, FaDollarSign, FaTag, FaBuilding, FaComments } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { FaTimes, FaCalendarAlt, FaDollarSign, FaTag, FaBuilding, FaComments, FaSpinner, FaUserSecret } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { getMatchingCampaigns, transformCampaignData } from '../../services/campaignService';
+import toast from 'react-hot-toast';
 
-// Sample campaigns data with brand information
-const campaignsData = [
-  {
-    id: 1,
-    title: 'Ice Hockey Final',
-    description: 'wear armani t shirt in the ice hockey world cup final',
-    budget: 37000,
-    status: 'Open',
-    sport: 'ice hockey',
-    createdDate: '2025-08-25',
-    brand: {
-      name: 'Armani Sports',
-      logo: '/brand-logo1.png',
-      description: 'Premium sports apparel brand',
-      website: 'www.armanisports.com'
-    },
-    requirements: [
-      'Must wear Armani t-shirt during the final match',
-      'Social media posts required (3 posts minimum)',
-      'Tag @ArmanSports in all posts',
-      'Professional photos during the event'
-    ],
-    duration: '1 day event',
-    deliverables: [
-      'Wear branded apparel during match',
-      '3 social media posts',
-      'Professional event photos',
-      'Post-event interview mention'
-    ]
-  },
-  {
-    id: 2,
-    title: 'Hockey Championship Gear',
-    description: 'Promote our new hockey gear line during championship season',
-    budget: 25000,
-    status: 'Open',
-    sport: 'ice hockey',
-    createdDate: '2025-01-15',
-    brand: {
-      name: 'ProHockey Gear',
-      logo: '/brand-logo2.png',
-      description: 'Professional hockey equipment manufacturer',
-      website: 'www.prohockeygear.com'
-    },
-    requirements: [
-      'Use ProHockey equipment during training',
-      'Create equipment review video',
-      'Attend brand photoshoot',
-      'Social media campaign participation'
-    ],
-    duration: '3 months',
-    deliverables: [
-      'Equipment usage during training',
-      '1 review video (5+ minutes)',
-      'Photoshoot participation',
-      '5 social media posts per month'
-    ]
-  },
-  {
-    id: 3,
-    title: 'Winter Sports Collection',
-    description: 'Showcase our winter sports apparel collection',
-    budget: 18000,
-    status: 'Open',
-    sport: 'ice hockey',
-    createdDate: '2025-01-10',
-    brand: {
-      name: 'Arctic Wear',
-      logo: '/brand-logo3.png',
-      description: 'Winter sports clothing specialist',
-      website: 'www.arcticwear.com'
-    },
-    requirements: [
-      'Wear Arctic Wear apparel in training',
-      'Create styling content',
-      'Participate in brand events',
-      'Cross-platform promotion'
-    ],
-    duration: '2 months',
-    deliverables: [
-      'Training session content',
-      'Styling videos and photos',
-      'Event appearances',
-      'Multi-platform posts'
-    ]
-  },
-  {
-    id: 4,
-    title: 'Energy Drink Partnership',
-    description: 'Promote our energy drink for athletes',
-    budget: 15000,
-    status: 'Completed',
-    sport: 'ice hockey',
-    createdDate: '2024-12-01',
-    brand: {
-      name: 'PowerBoost Energy',
-      logo: '/brand-logo4.png',
-      description: 'Premium energy drinks for athletes',
-      website: 'www.powerboost.com'
-    },
-    requirements: [
-      'Use PowerBoost during training',
-      'Create testimonial content',
-      'Attend launch event',
-      'Social media endorsement'
-    ],
-    duration: '1 month',
-    deliverables: [
-      'Product usage content',
-      'Testimonial video',
-      'Event participation',
-      'Social endorsements'
-    ]
-  }
-];
+
 
 const AthleteCampaigns = () => {
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const navigate = useNavigate();
+
+  // Fetch campaigns on component mount
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const rawCampaigns = await getMatchingCampaigns();
+        const transformedCampaigns = transformCampaignData(rawCampaigns);
+        setCampaigns(transformedCampaigns);
+      } catch (err) {
+        setError('Failed to load campaigns');
+        console.error('Error fetching campaigns:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCampaigns();
+  }, []);
   
   // Filter campaigns based on status
-  const filteredCampaigns = campaignsData.filter(campaign => {
+  const filteredCampaigns = campaigns.filter(campaign => {
     if (filterStatus === 'all') return true;
     return campaign.status.toLowerCase() === filterStatus.toLowerCase();
   });
@@ -137,7 +48,18 @@ const AthleteCampaigns = () => {
 
   const handleChatClick = (e, campaign) => {
     e.stopPropagation();
-    navigate('/chats');
+    if (!campaign.brand) {
+      toast.error('Cannot start chat - brand information not available');
+      return;
+    }
+    // Navigate to chats with brand info
+    navigate('/chats', { 
+      state: { 
+        selectedAthleteId: campaign.brand.id, 
+        selectedAthleteName: campaign.isAnonymous ? 'Anonymous Brand' : (campaign.brand.name || campaign.brand.email)
+      } 
+    });
+    toast.success(`Opening chat with ${campaign.isAnonymous ? 'anonymous brand' : 'brand'}...`);
   };
 
   const getStatusColor = (status) => {
@@ -190,8 +112,37 @@ const AthleteCampaigns = () => {
         </div>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <FaSpinner className="animate-spin text-[#9afa00] text-3xl mr-3" />
+          <span className="text-white text-lg">Loading campaigns...</span>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-12">
+          <p className="text-red-400 text-lg mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-[#9afa00] text-black px-6 py-2 rounded-md font-bold hover:bg-[#baff32] transition"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* No Campaigns State */}
+      {!loading && !error && filteredCampaigns.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-400 text-lg">No campaigns available for your sport.</p>
+        </div>
+      )}
+
       {/* Campaigns Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {!loading && !error && filteredCampaigns.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCampaigns.map(campaign => (
           <div
             key={campaign.id}
@@ -211,11 +162,24 @@ const AthleteCampaigns = () => {
             {/* Brand Information */}
             <div className="flex items-center gap-3 mb-4 p-3 bg-[#181c1a] rounded-lg">
               <div className="w-12 h-12 bg-[#9afa00] rounded-full flex items-center justify-center">
-                <FaBuilding className="text-black text-lg" />
+                {campaign.isAnonymous ? (
+                  <FaUserSecret className="text-black text-lg" />
+                ) : (
+                  <FaBuilding className="text-black text-lg" />
+                )}
               </div>
               <div>
-                <h4 className="text-[#9afa00] font-bold text-sm">{campaign.brand.name}</h4>
-                <p className="text-gray-300 text-xs">{campaign.brand.description}</p>
+                {campaign.isAnonymous ? (
+                  <>
+                    <h4 className="text-[#9afa00] font-bold text-sm">Anonymous Brand</h4>
+                    <p className="text-gray-300 text-xs">Brand details hidden</p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="text-[#9afa00] font-bold text-sm">{campaign.brand?.name || 'Unknown Brand'}</h4>
+                    <p className="text-gray-300 text-xs">{campaign.brand?.email || 'No description available'}</p>
+                  </>
+                )}
               </div>
             </div>
 
@@ -242,7 +206,13 @@ const AthleteCampaigns = () => {
               </div>
               <button
                 onClick={(e) => handleChatClick(e, campaign)}
-                className="bg-[#9afa00] text-black px-3 py-1 rounded-md font-bold text-xs hover:bg-[#baff32] transition flex items-center gap-1"
+                disabled={!campaign.brand}
+                className={`px-3 py-1 rounded-md font-bold text-xs transition flex items-center gap-1 ${
+                  !campaign.brand
+                    ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                    : 'bg-[#9afa00] text-black hover:bg-[#baff32]'
+                }`}
+                title={!campaign.brand ? 'Chat not available' : `Start chat with ${campaign.isAnonymous ? 'anonymous brand' : 'brand'}`}
               >
                 <FaComments className="text-xs" />
                 Chat
@@ -250,11 +220,12 @@ const AthleteCampaigns = () => {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Campaign Detail Modal */}
       {showModal && selectedCampaign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 backdrop-blur-sm px-4">
           <div className="relative w-full max-w-4xl bg-[#1B2317] rounded-2xl shadow-lg p-6 max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
             <button
@@ -280,74 +251,58 @@ const AthleteCampaigns = () => {
                 <h3 className="text-[#9afa00] text-lg font-bold mb-4">Brand Information</h3>
                 <div className="flex items-start gap-4">
                   <div className="w-16 h-16 bg-[#9afa00] rounded-full flex items-center justify-center flex-shrink-0">
-                    <FaBuilding className="text-black text-2xl" />
+                    {selectedCampaign.isAnonymous ? (
+                      <FaUserSecret className="text-black text-2xl" />
+                    ) : (
+                      <FaBuilding className="text-black text-2xl" />
+                    )}
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-white text-xl font-bold mb-2">{selectedCampaign.brand.name}</h4>
-                    <p className="text-gray-300 mb-2">{selectedCampaign.brand.description}</p>
-                    <a href={`https://${selectedCampaign.brand.website}`} target="_blank" rel="noopener noreferrer" className="text-[#9afa00] hover:underline text-sm">
-                      {selectedCampaign.brand.website}
-                    </a>
+                    {selectedCampaign.isAnonymous ? (
+                      <>
+                        <h4 className="text-white text-xl font-bold mb-2">Anonymous Brand</h4>
+                        <p className="text-gray-300 mb-2">This campaign is posted anonymously. Brand details are hidden to protect privacy.</p>
+                        <p className="text-[#9afa00] text-sm">Brand information will be revealed upon campaign acceptance.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h4 className="text-white text-xl font-bold mb-2">{selectedCampaign.brand?.name || 'Unknown Brand'}</h4>
+                        <p className="text-gray-300 mb-2">{selectedCampaign.brand?.email || 'No description available'}</p>
+                        {selectedCampaign.brand?.logo && (
+                          <img src={selectedCampaign.brand.logo} alt="Brand Logo" className="w-12 h-12 object-contain" />
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Campaign Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Left Column */}
-                <div>
-                  <div className="mb-6">
-                    <h3 className="text-[#9afa00] text-lg font-bold mb-3">Campaign Details</h3>
-                    <p className="text-gray-300 leading-relaxed">{selectedCampaign.description}</p>
-                  </div>
-
-                  <div className="mb-6">
-                    <h3 className="text-[#9afa00] text-lg font-bold mb-3">Requirements</h3>
-                    <ul className="space-y-2">
-                      {selectedCampaign.requirements.map((req, index) => (
-                        <li key={index} className="flex items-start gap-2 text-gray-300">
-                          <span className="text-[#9afa00] mt-1">•</span>
-                          <span className="text-sm">{req}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Right Column */}
-                <div>
-                  <div className="mb-6">
-                    <h3 className="text-[#9afa00] text-lg font-bold mb-3">Campaign Info</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <FaDollarSign className="text-[#9afa00]" />
-                        <span className="text-white font-bold text-xl">${selectedCampaign.budget.toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <FaCalendarAlt className="text-[#9afa00]" />
-                        <span className="text-gray-300">Created: {new Date(selectedCampaign.createdDate).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <FaTag className="text-[#9afa00]" />
-                        <span className="text-gray-300">Sport: {selectedCampaign.sport}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <FaCalendarAlt className="text-[#9afa00]" />
-                        <span className="text-gray-300">Duration: {selectedCampaign.duration}</span>
-                      </div>
+              {/* Campaign Details */}
+              <div className="mb-6">
+                <h3 className="text-[#9afa00] text-lg font-bold mb-3">Campaign Details</h3>
+                <p className="text-gray-300 leading-relaxed mb-6">{selectedCampaign.description}</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <FaDollarSign className="text-[#9afa00]" />
+                      <span className="text-white font-bold text-xl">${selectedCampaign.budget.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <FaTag className="text-[#9afa00]" />
+                      <span className="text-gray-300">Sport: {selectedCampaign.sport}</span>
                     </div>
                   </div>
-
-                  <div className="mb-6">
-                    <h3 className="text-[#9afa00] text-lg font-bold mb-3">Deliverables</h3>
-                    <ul className="space-y-2">
-                      {selectedCampaign.deliverables.map((deliverable, index) => (
-                        <li key={index} className="flex items-start gap-2 text-gray-300">
-                          <span className="text-[#9afa00] mt-1">✓</span>
-                          <span className="text-sm">{deliverable}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <FaCalendarAlt className="text-[#9afa00]" />
+                      <span className="text-gray-300">Created: {new Date(selectedCampaign.createdDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold text-white ${getStatusColor(selectedCampaign.status)}`}>
+                        Status: {selectedCampaign.status.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaEllipsisV, FaTimes, FaCheckCircle, FaCamera, FaCrop } from 'react-icons/fa';
+import { FaEllipsisV, FaTimes, FaCheckCircle, FaCamera, FaCrop, FaUsers, FaGraduationCap, FaHashtag, FaHandshake } from 'react-icons/fa';
+import { MdSportsVolleyball, MdLocationOn } from 'react-icons/md';
+import { FaInstagram, FaFacebook, FaTwitter, FaLinkedin, FaYoutube, FaTiktok } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { uploadFile } from '../../services/uploadService';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('brand');
+  const [activeTab, setActiveTab] = useState('personal');
   const [profileImage, setProfileImage] = useState('https://randomuser.me/api/portraits/men/32.jpg');
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -17,6 +22,165 @@ const Navbar = () => {
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
+  const [userData, setUserData] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [athleteFormData, setAthleteFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
+    origin: '',
+    schoolAndClassYear: '',
+    sport: '',
+    position: '',
+    profileType: 'College',
+    achievements: '',
+    instagram: '',
+    facebook: '',
+    twitter: '',
+    linkedin: '',
+    youtube: '',
+    tiktok: '',
+    followersCount: '',
+    audienceDemographics: '',
+    contentNiche: '',
+    pastCollaborations: '',
+    brandPreferences: '',
+    uniquePitch: ''
+  });
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  // Get user data from localStorage
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      const parsedUser = JSON.parse(user);
+      setUserData(parsedUser);
+      
+      // Populate athlete form data if user is athlete
+      if (parsedUser.role === 'athlete' && parsedUser.athleteProfile) {
+        setAthleteFormData({
+          firstName: parsedUser.athleteProfile.firstName || '',
+          lastName: parsedUser.athleteProfile.lastName || '',
+          phoneNumber: parsedUser.athleteProfile.phoneNumber || '',
+          origin: parsedUser.athleteProfile.origin || '',
+          schoolAndClassYear: parsedUser.athleteProfile.schoolAndClassYear || '',
+          sport: parsedUser.athleteProfile.sport || '',
+          position: parsedUser.athleteProfile.position || '',
+          profileType: parsedUser.athleteProfile.profileType || 'College',
+          achievements: parsedUser.athleteProfile.achievements || '',
+          instagram: parsedUser.athleteProfile.instagram || '',
+          facebook: parsedUser.athleteProfile.facebook || '',
+          twitter: parsedUser.athleteProfile.twitter || '',
+          linkedin: parsedUser.athleteProfile.linkedin || '',
+          youtube: parsedUser.athleteProfile.youtube || '',
+          tiktok: parsedUser.athleteProfile.tiktok || '',
+          followersCount: parsedUser.athleteProfile.followersCount || '',
+          audienceDemographics: parsedUser.athleteProfile.audienceDemographics || '',
+          contentNiche: parsedUser.athleteProfile.contentNiche || '',
+          pastCollaborations: parsedUser.athleteProfile.pastCollaborations || '',
+          brandPreferences: parsedUser.athleteProfile.brandPreferences || '',
+          uniquePitch: parsedUser.athleteProfile.uniquePitch || ''
+        });
+      }
+    }
+  }, []);
+
+  // Helper functions to get user profile data with fallbacks
+  const getUserName = () => {
+    if (userData?.role === 'athlete') {
+      const firstName = userData?.athleteProfile?.firstName;
+      const lastName = userData?.athleteProfile?.lastName;
+      if (firstName && lastName) {
+        return `${firstName} ${lastName}`;
+      } else if (firstName) {
+        return firstName;
+      }
+    } else if (userData?.role === 'brand') {
+      const brandName = userData?.brandProfile?.brandName || userData?.brandProfile?.companyName;
+      if (brandName) {
+        return brandName;
+      }
+    }
+    return 'Professional User';
+  };
+
+  const getUserEmail = () => {
+    return userData?.email || 'user@professional.com';
+  };
+
+  const getUserProfileImage = () => {
+    if (userData?.role === 'athlete') {
+      return userData?.athleteProfile?.profilePictureUrl || profileImage;
+    } else if (userData?.role === 'brand') {
+      return userData?.brandProfile?.logo || userData?.brandProfile?.profilePictureUrl || profileImage;
+    }
+    return profileImage;
+  };
+
+  const getBrandCategory = () => {
+    return userData?.brandProfile?.category || userData?.brandProfile?.industry || 'Professional Services';
+  };
+
+  // Handle athlete form data changes
+  const handleAthleteInputChange = (e) => {
+    const { name, value } = e.target;
+    setAthleteFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Update athlete profile
+  const updateAthleteProfile = async () => {
+    try {
+      setIsSaving(true);
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const updateData = { ...athleteFormData };
+      
+      // Add profile image URL if it exists
+      if (profileImage && profileImage !== 'https://randomuser.me/api/portraits/men/32.jpg') {
+        updateData.profilePictureUrl = profileImage;
+      }
+
+      const response = await axios.patch(
+        `${baseUrl}users/athlete-profile`,
+        updateData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        // Update localStorage with new data
+        const updatedUserData = {
+          ...userData,
+          athleteProfile: {
+            ...userData.athleteProfile,
+            ...updateData
+          }
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUserData));
+        setUserData(updatedUserData);
+        
+        toast.success('Profile updated successfully!');
+        setProfileModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error updating athlete profile:', error);
+      toast.error('Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -42,7 +206,7 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const handleImageUpload = (event) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
@@ -54,7 +218,7 @@ const Navbar = () => {
     }
   };
 
-  const handleCropSave = () => {
+  const handleCropSave = async () => {
     if (canvasRef.current && imageRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
@@ -69,10 +233,50 @@ const Navbar = () => {
         0, 0, cropData.size, cropData.size
       );
       
-      const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.8);
-      setProfileImage(croppedImageUrl);
-      setCropModalOpen(false);
-      setSelectedImage(null);
+      try {
+        setIsUploading(true);
+        
+        // Convert canvas to blob
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.8);
+        });
+        
+        // Create file from blob
+        const file = new File([blob], 'profile-image.jpg', { type: 'image/jpeg' });
+        
+        // Upload to S3
+        const uploadResult = await uploadFile(file);
+        
+        // Update profile image
+        setProfileImage(uploadResult.mediaUrl);
+        
+        // Update user data in localStorage if needed
+        if (userData) {
+          const updatedUserData = { ...userData };
+          if (userData.role === 'athlete') {
+            updatedUserData.athleteProfile = {
+              ...updatedUserData.athleteProfile,
+              profileImage: uploadResult.mediaUrl
+            };
+          } else if (userData.role === 'brand') {
+            updatedUserData.brandProfile = {
+              ...updatedUserData.brandProfile,
+              profileImage: uploadResult.mediaUrl
+            };
+          }
+          localStorage.setItem('user', JSON.stringify(updatedUserData));
+          setUserData(updatedUserData);
+        }
+        
+        toast.success('Profile image updated successfully!');
+        setCropModalOpen(false);
+        setSelectedImage(null);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast.error('Failed to upload image. Please try again.');
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -120,13 +324,13 @@ const Navbar = () => {
         {/* Profile info and avatar only on md+ */}
         <div className="hidden md:flex items-center gap-4">
           <img
-            src={profileImage}
+            src={getUserProfileImage()}
             alt="User Avatar"
             className="h-12 w-12 md:h-16 md:w-16 rounded-full object-cover border-2 border-white"
           />
           <div className="flex flex-col items-start justify-center">
-            <span className="text-white font-bold text-base md:text-lg leading-tight">PRO SPORTS VENTURES</span>
-            <span className="text-white text-xs md:text-md leading-tight">Pawasaurora012@gmail.com</span>
+            <span className="text-white font-bold text-base md:text-lg leading-tight">{getUserName()}</span>
+            <span className="text-white text-xs md:text-md leading-tight">{getUserEmail()}</span>
           </div>
         </div>
         {/* Three dots always visible */}
@@ -164,7 +368,7 @@ const Navbar = () => {
               {/* Header */}
               <div className="w-full flex flex-row items-center gap-4 bg-[#23281e] rounded-t-2xl px-6 pt-6 pb-4 border-b border-[#2e3627]">
                 <div className="relative">
-                  <img src={profileImage} alt="Brand Avatar" className="h-14 w-14 rounded-full object-cover border-2 border-[#9afa00]" />
+                  <img src={getUserProfileImage()} alt="User Avatar" className="h-14 w-14 rounded-full object-cover border-2 border-[#9afa00]" />
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="absolute -bottom-1 -right-1 bg-[#9afa00] text-black rounded-full p-1.5 hover:bg-[#baff32] transition"
@@ -181,8 +385,8 @@ const Navbar = () => {
                   />
                 </div>
                 <div className="flex flex-col flex-1">
-                  <span className="text-white font-bold text-lg md:text-xl">PRO SPORTS VENTURES</span>
-                  <span className="text-[#baff32] text-base md:text-lg">Media & Entertainment</span>
+                  <span className="text-white font-bold text-lg md:text-xl">{getUserName()}</span>
+                  <span className="text-[#baff32] text-base md:text-lg">{getBrandCategory()}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <FaCheckCircle className="text-[#9afa00] text-xl" />
@@ -191,29 +395,410 @@ const Navbar = () => {
               </div>
               {/* Tabs */}
               <div className="flex flex-row w-full border-b border-[#2e3627] bg-[#23281e] px-6">
-                <button
-                  className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'brand' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
-                  onClick={() => setActiveTab('brand')}
-                >
-                  Brand Identity
-                </button>
-                <button
-                  className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'account' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
-                  onClick={() => setActiveTab('account')}
-                >
-                  Account Setting
-                </button>
+                {userData?.role === 'athlete' ? (
+                  <>
+                    <button
+                      className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'personal' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
+                      onClick={() => setActiveTab('personal')}
+                    >
+                      Personal
+                    </button>
+                    <button
+                      className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'social' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
+                      onClick={() => setActiveTab('social')}
+                    >
+                      Social
+                    </button>
+                    <button
+                      className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'preferences' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
+                      onClick={() => setActiveTab('preferences')}
+                    >
+                      Preferences
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'brand' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
+                      onClick={() => setActiveTab('brand')}
+                    >
+                      Brand Identity
+                    </button>
+                    <button
+                      className={`py-4 px-4 font-bold uppercase text-base md:text-lg transition-all border-b-4 ${activeTab === 'account' ? 'text-[#9afa00] border-[#9afa00]' : 'text-white border-transparent hover:text-[#9afa00]'}`}
+                      onClick={() => setActiveTab('account')}
+                    >
+                      Account Setting
+                    </button>
+                  </>
+                )}
               </div>
               {/* Tab Content */}
               <div className="flex-1 flex flex-col min-h-[300px]">
                 <div className="flex-1 overflow-y-auto px-6 pt-4 pb-2 max-h-[60vh]">
-                  {activeTab === 'brand' && (
+                  {userData?.role === 'athlete' ? (
+                    <form className="flex flex-col gap-6">
+                      {activeTab === 'personal' && (
+                        <>
+                          {/* Personal Information Section */}
+                      <div>
+                        <h3 className="text-[#9afa00] text-xl font-bold mb-4 flex items-center gap-2">
+                          <FaUsers /> Personal Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">First Name *</label>
+                            <input 
+                              name="firstName"
+                              value={athleteFormData.firstName}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="Enter first name"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Last Name *</label>
+                            <input 
+                              name="lastName"
+                              value={athleteFormData.lastName}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="Enter last name"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Phone Number *</label>
+                            <input 
+                              name="phoneNumber"
+                              value={athleteFormData.phoneNumber}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="+1234567890"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Origin/National Background *</label>
+                            <input 
+                              name="origin"
+                              value={athleteFormData.origin}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., USA, Canada, Mexico"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Email *</label>
+                            <input 
+                              type="email"
+                              value={getUserEmail()}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="Enter email address"
+                              readOnly
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Academic & Athletic Information Section */}
+                      <div>
+                        <h3 className="text-[#9afa00] text-xl font-bold mb-4 flex items-center gap-2">
+                          <FaGraduationCap /> Academic & Athletic Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">School & Class Year *</label>
+                            <input 
+                              name="schoolAndClassYear"
+                              value={athleteFormData.schoolAndClassYear}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., Texas High 2024"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Sport *</label>
+                            <input 
+                              name="sport"
+                              value={athleteFormData.sport}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., Basketball, Football, Soccer"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Position *</label>
+                            <input 
+                              name="position"
+                              value={athleteFormData.position}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., Point Guard, Quarterback"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Profile Type</label>
+                            <select 
+                              name="profileType"
+                              value={athleteFormData.profileType}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm"
+                            >
+                              <option value="High School">High School</option>
+                              <option value="College">College</option>
+                              <option value="Professional">Professional</option>
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-white text-sm md:text-base mb-1 block">Achievements</label>
+                            <input 
+                              name="achievements"
+                              value={athleteFormData.achievements}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., MVP 2023, State Champion"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-white text-sm md:text-base mb-1 block">Audience Demographics</label>
+                            <input 
+                              name="audienceDemographics"
+                              value={athleteFormData.audienceDemographics}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., 18-24 years old, 60% male, sports enthusiasts"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-white text-sm md:text-base mb-1 block">Past Collaborations</label>
+                            <input 
+                              name="pastCollaborations"
+                              value={athleteFormData.pastCollaborations}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., Nike, Adidas, Local Sports Store"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-white text-sm md:text-base mb-1 block">Brand Preferences</label>
+                            <input 
+                              name="brandPreferences"
+                              value={athleteFormData.brandPreferences}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="e.g., Athletic wear, Health supplements, Tech gadgets"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-white text-sm md:text-base mb-1 block">Unique Pitch</label>
+                            <textarea 
+                              name="uniquePitch"
+                              value={athleteFormData.uniquePitch}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="What makes you unique as an athlete and influencer?"
+                              rows="3"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+
+
+                      {/* Brand Collaboration Section */}
+                      <div>
+                        <h3 className="text-[#9afa00] text-xl font-bold mb-4 flex items-center gap-2">
+                          <FaHandshake /> Brand Collaboration
+                        </h3>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Audience Demographics *</label>
+                            <textarea 
+                              name="audienceDemographics"
+                              value={athleteFormData.audienceDemographics}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm min-h-[60px]" 
+                              placeholder="Describe your followers (age range, location, interests)"
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Past Collaborations</label>
+                            <textarea 
+                              name="pastCollaborations"
+                              value={athleteFormData.pastCollaborations}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm min-h-[60px]" 
+                              placeholder="List brands you've worked with (e.g., Nike Junior Program, Local Sports Store)"
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Brand Preferences</label>
+                            <textarea 
+                              name="brandPreferences"
+                              value={athleteFormData.brandPreferences}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm min-h-[60px]" 
+                              placeholder="What types of brands/products would you love to work with?"
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-white text-sm md:text-base mb-1 block">Unique Pitch *</label>
+                            <textarea 
+                              name="uniquePitch"
+                              value={athleteFormData.uniquePitch}
+                              onChange={handleAthleteInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm min-h-[60px]" 
+                              placeholder="In one sentence, what are your goals in the NIL Space?"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                        </>
+                      )}
+                      
+                      {activeTab === 'social' && (
+                        <>
+                          {/* Social Media & Content Section */}
+                          <div>
+                            <h3 className="text-[#9afa00] text-xl font-bold mb-4 flex items-center gap-2">
+                              <FaHashtag /> Social Media & Content
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
+                                  <FaInstagram className="text-pink-500" /> Instagram Handle
+                                </label>
+                                <input 
+                                  name="instagram"
+                                  value={athleteFormData.instagram}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="@your_handle"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
+                                  <FaTiktok className="text-black" /> TikTok Handle
+                                </label>
+                                <input 
+                                  name="tiktok"
+                                  value={athleteFormData.tiktok}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="@your_handle"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
+                                  <FaTwitter className="text-blue-400" /> Twitter Handle
+                                </label>
+                                <input 
+                                  name="twitter"
+                                  value={athleteFormData.twitter}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="@your_handle"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
+                                  <FaYoutube className="text-red-500" /> YouTube Channel
+                                </label>
+                                <input 
+                                  name="youtube"
+                                  value={athleteFormData.youtube}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="@your_channel"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
+                                  <FaLinkedin className="text-blue-600" /> LinkedIn Profile
+                                </label>
+                                <input 
+                                  name="linkedin"
+                                  value={athleteFormData.linkedin}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="@your_profile"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
+                                  <FaFacebook className="text-blue-500" /> Facebook Profile
+                                </label>
+                                <input 
+                                  name="facebook"
+                                  value={athleteFormData.facebook}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="@your_profile"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block">Followers Count</label>
+                                <input 
+                                  name="followersCount"
+                                  value={athleteFormData.followersCount}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                                  placeholder="e.g., 10000"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-white text-sm md:text-base mb-1 block">Content Niche</label>
+                                <select 
+                                  name="contentNiche"
+                                  value={athleteFormData.contentNiche}
+                                  onChange={handleAthleteInputChange}
+                                  className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm"
+                                >
+                                  <option value="">Select Content Niche</option>
+                                  <option value="Gaming">Gaming</option>
+                                  <option value="Sports">Sports</option>
+                                  <option value="Fitness">Fitness</option>
+                                  <option value="Lifestyle">Lifestyle</option>
+                                  <option value="Education">Education</option>
+                                  <option value="Entertainment">Entertainment</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      
+                      {activeTab === 'preferences' && (
+                        <>
+                          {/* Multi-Factor Authentication Section */}
+                          <div className="bg-[#232626] rounded-lg p-4">
+                            <h3 className="text-[#9afa00] text-xl font-bold mb-4">Multi-Factor Authentication</h3>
+                            <p className="text-white text-xs md:text-sm mb-4">You can enable MFA to add an extra layer of security to your account. When you log in, you will be required to enter a code sent to your phone or email address.</p>
+                            <div className="flex items-center gap-2 mb-4">
+                              <input type="checkbox" id="athlete-enable-mfa" className="accent-[#9afa00] w-4 h-4" />
+                              <label htmlFor="athlete-enable-mfa" className="text-white text-xs md:text-sm">Enable MFA</label>
+                            </div>
+                            <div>
+                              <label className="text-white text-xs md:text-sm mb-1 block">MFA Device</label>
+                              <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
+                                <option>Email</option>
+                                <option>SMS</option>
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </form>
+                  ) : activeTab === 'brand' && (
                     <form className="flex flex-col gap-6">
                       {/* Brand Representatives */}
                       <div>
                         <span className="text-[#9afa00] font-bold text-lg flex items-center gap-2">BRAND REPRESENTATIVES <FaCheckCircle className="text-[#9afa00] text-base" /></span>
-                        <div className="text-white mt-2 text-sm md:text-base">Name: PRO SPORTS VENTURES</div>
-                        <div className="text-white text-sm md:text-base">Job Title: Empty</div>
+                        <div className="text-white mt-2 text-sm md:text-base">Name: {getUserName()}</div>
+                        <div className="text-white text-sm md:text-base">Job Title: {userData?.brandProfile?.jobTitle || 'Not Specified'}</div>
                       </div>
                       {/* Brand Identity */}
                       <div>
@@ -221,16 +806,16 @@ const Navbar = () => {
                         <div className="mt-2 flex flex-col gap-4">
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Brand Name</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="PRO SPORTS VENTURES" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.brandProfile?.brandName || userData?.brandProfile?.companyName || 'Professional Brand'} />
                           </div>
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Brand Website URL</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="PRO SPORTS VENTURES" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.brandProfile?.website || 'https://professional-brand.com'} />
                           </div>
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Brand Category</label>
                             <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
-                              <option>Media & Entertainment</option>
+                              <option>{getBrandCategory()}</option>
                             </select>
                           </div>
                           <div>
@@ -285,15 +870,15 @@ const Navbar = () => {
                         <div className="mt-2 flex flex-col gap-4">
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">First Name</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="PRO SPORTS VENTURES" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.athleteProfile?.firstName || userData?.brandProfile?.firstName || 'Professional'} />
                           </div>
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Last Name</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="PRO SPORTS VENTURES" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.athleteProfile?.lastName || userData?.brandProfile?.lastName || 'User'} />
                           </div>
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Job Title</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" placeholder="Enter Job Title" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.brandProfile?.jobTitle || userData?.athleteProfile?.position || 'Professional'} placeholder="Enter Job Title" />
                           </div>
                         </div>
                       </div>
@@ -303,11 +888,11 @@ const Navbar = () => {
                         <div className="mt-2 flex flex-col gap-4">
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Email</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="prosportsventures@gmail.com" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={getUserEmail()} />
                           </div>
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Phone Number</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="987574320976" />
+                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.athleteProfile?.phoneNumber || userData?.brandProfile?.phoneNumber || '+1 (555) 123-4567'} />
                           </div>
                           <div>
                             <label className="text-white text-sm md:text-base mb-1 block">Extension</label>
@@ -343,10 +928,12 @@ const Navbar = () => {
                     Cancel
                   </button>
                   <button
-                    className="flex-1 bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-base hover:bg-[#baff32] transition"
-                    type="submit"
+                    className="flex-1 bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-base hover:bg-[#baff32] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    type="button"
+                    onClick={userData?.role === 'athlete' ? updateAthleteProfile : undefined}
+                    disabled={isSaving}
                   >
-                    Save
+                    {isSaving ? 'Saving...' : 'Save'}
                   </button>
                 </div>
               </div>

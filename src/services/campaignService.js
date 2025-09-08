@@ -92,3 +92,50 @@ export const deleteCampaign = async (campaignId) => {
     throw error;
   }
 };
+
+/**
+ * Get campaigns that match the athlete's sport
+ * @returns {Promise<Array>} Array of campaign objects
+ */
+export const getMatchingCampaigns = async () => {
+  try {
+    const response = await axios.get(
+      `${baseUrl}campaigns/match/my-sport`,
+      {
+        headers: createAuthHeaders()
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching matching campaigns:', error);
+    toast.error(error.response?.data?.message || 'Failed to fetch campaigns');
+    throw error;
+  }
+};
+
+/**
+ * Transform API campaign data to match component expectations
+ * @param {Array} campaigns - Raw campaign data from API
+ * @returns {Array} Transformed campaign data
+ */
+export const transformCampaignData = (campaigns) => {
+  return campaigns.map(campaign => ({
+    id: campaign.id,
+    title: campaign.title,
+    description: campaign.description,
+    budget: parseInt(campaign.budget),
+    status: campaign.status,
+    sport: campaign.targetSport,
+    createdDate: campaign.createdAt,
+    isAnonymous: campaign.isAnonymous,
+    brand: campaign.brand ? {
+      id: campaign.brand.id,
+      name: campaign.brand.name,
+      logo: campaign.brand.logo,
+      email: campaign.brand.email,
+      profile: campaign.brand.profile,
+      createdAt: campaign.brand.createdAt,
+      updatedAt: campaign.brand.updatedAt
+    } : null
+  }));
+};

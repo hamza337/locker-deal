@@ -39,6 +39,25 @@ class VideoCallService {
     }
   }
 
+  // Sanitize channel name for Agora requirements
+  // sanitizeChannelName(channelName) {
+  //   // Remove invalid characters and keep only allowed ones
+  //   let sanitized = channelName.replace(/[^a-zA-Z0-9!#$%&()+\-:;<=>?@\[\]^_{|}~, ]/g, '');
+    
+  //   // If still too long, create a hash-based shorter version
+  //   if (sanitized.length > 64) {
+  //     // Take first 32 chars and create a simple hash of the full string
+  //     const hash = channelName.split('').reduce((a, b) => {
+  //       a = ((a << 5) - a) + b.charCodeAt(0);
+  //       return a & a;
+  //     }, 0);
+  //     sanitized = channelName.substring(0, 32) + '_' + Math.abs(hash).toString(36);
+  //   }
+    
+  //   // Ensure it's still within 64 bytes
+  //   return sanitized.substring(0, 64);
+  // }
+
   // Join a video call channel
   async joinCall(channelName, token = null, uid = null) {
     try {
@@ -47,7 +66,12 @@ class VideoCallService {
         if (!initialized) return false;
       }
 
-      // Join the channel
+      console.log('🔧 Joining channel:', channelName);
+      console.log('🔧 Using token:', token ? 'Token provided' : 'No token');
+      console.log('🔧 App ID:', this.appId);
+
+      // Use original channel name since token is generated for it
+      // Note: If channel name is too long, the backend should handle sanitization
       const assignedUid = await this.client.join(this.appId, channelName, token, uid);
       console.log('✅ Joined channel:', channelName, 'with UID:', assignedUid);
       

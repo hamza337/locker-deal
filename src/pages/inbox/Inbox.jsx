@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo } from 'react-icons/fa';
+import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo, FaSmile } from 'react-icons/fa';
+import EmojiPicker from 'emoji-picker-react';
 import { getChatList, getChatHistory } from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { uploadFile, validateFile } from '../../services/uploadService';
@@ -8,12 +9,48 @@ import { getChatAttachments, getSignableAttachments } from '../../services/attac
 import { createMeeting, validateMeetingData, getDefaultMeetingTimes } from '../../services/meetingService';
 import VideoCall from '../../components/chat/VideoCall';
 import videoCallService from '../../services/videoCallService';
+import documentSigningService from '../../services/documentSigningService';
 import toast from 'react-hot-toast';
-import jsPDF from 'jspdf';
 
 // Dynamic documents will be fetched from API
 
 const Inbox = () => {
+  // Helper function to extract filename from S3 URL and apply ellipsis
+  const extractFilenameFromUrl = (url, maxLength = 30) => {
+    if (!url) return 'Unknown file';
+    
+    try {
+      // Check if it's an S3 URL with 'others/' path
+      if (url.includes('/others/')) {
+        const parts = url.split('/others/');
+        if (parts.length > 1) {
+          // Get the part after 'others/'
+          const afterOthers = parts[1];
+          // Remove any query parameters or additional path segments
+          const filename = afterOthers.split('?')[0].split('/')[0];
+          
+          // Apply ellipsis if too long
+          if (filename.length > maxLength) {
+            return filename.substring(0, maxLength - 3) + '...';
+          }
+          return filename;
+        }
+      }
+      
+      // Fallback: extract filename from URL path
+      const urlPath = new URL(url).pathname;
+      const filename = urlPath.split('/').pop() || 'Unknown file';
+      
+      // Apply ellipsis if too long
+      if (filename.length > maxLength) {
+        return filename.substring(0, maxLength - 3) + '...';
+      }
+      return filename;
+    } catch (error) {
+      console.error('Error extracting filename from URL:', error);
+      return 'Unknown file';
+    }
+  };
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -52,11 +89,16 @@ const Inbox = () => {
     channelName: ''
   });
   const [creatingMeeting, setCreatingMeeting] = useState(false);
+  
+  // Emoji picker states
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
   const canvasRef = useRef(null);
   const documentRef = useRef(null);
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -234,42 +276,85 @@ const Inbox = () => {
     // Subscribe to chat list updates
     const unsubscribeChatList = socketService.onChatListUpdate(handleChatListUpdate);
     
-    // Video call event listeners
-    const handleIncomingCall = (callData) => {
-      console.log('📞 Incoming video call received:', callData);
+    // Video call event listeners for new backend events
+    const handleIncomingCall = ({ from, channelName }) => {
+      console.log('📞 Incoming video call received:', { from, channelName });
       console.log('📞 Current user:', JSON.parse(localStorage.getItem('user') || '{}'));
       console.log('📞 Socket connected:', socketService.socket?.connected);
-      console.log('📞 Current showVideoCall state:', showVideoCall);
       
       setVideoCallData({
-        callerName: callData.callerName || 'Unknown User',
-        callerId: callData.callerId,
-        channelName: callData.channelName
+        callerName: from?.name || from?.email || 'Unknown User',
+        callerId: from?.id || from,
+        channelName: channelName
       });
       setVideoCallType('incoming');
       setShowVideoCall(true);
       
       console.log('📞 Updated video call state - showing modal');
-      toast.success(`Incoming video call from ${callData.callerName}`);
+      toast.success(`Incoming video call from ${from?.name || from?.email || 'Unknown User'}`);
     };
 
-    const handleCallRejected = (callData) => {
-      console.log('📞 Video call rejected:', callData);
+    const handleCallAccepted = ({ user, token }) => {
+      console.log('📞 Video call accepted:', { user, token });
+      
+      // The caller has already joined the Agora channel when initiating the call
+      // So we just need to update the UI state to 'active'
+      if (videoCallService.isInCall()) {
+        setVideoCallType('active');
+        toast.success('Call connected!');
+      } else {
+        // Fallback: try to join with token if provided
+        if (token && videoCallData.channelName) {
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          videoCallService.joinCall(videoCallData.channelName, token, currentUser.id)
+            .then(success => {
+              if (success) {
+                setVideoCallType('active');
+                toast.success('Call connected!');
+              } else {
+                setShowVideoCall(false);
+                toast.error('Failed to connect to call');
+              }
+            })
+            .catch(error => {
+              console.error('❌ Failed to join call after acceptance:', error);
+              setShowVideoCall(false);
+              toast.error('Failed to connect to call');
+            });
+        } else {
+          console.warn('⚠️ No token provided and not already in call');
+          setShowVideoCall(false);
+          toast.error('Failed to connect to call');
+        }
+      }
+    };
+
+    const handleCallRejected = ({ by }) => {
+      console.log('📞 Video call rejected by:', by);
       setShowVideoCall(false);
-      toast.error('Call was rejected');
+      toast.error(`Call was rejected by ${by?.name || by?.email || 'user'}`);
+    };
+
+    const handleCallEnded = ({ by }) => {
+      console.log('📞 Video call ended by:', by);
+      videoCallService.leaveCall();
+      setShowVideoCall(false);
+      setVideoCallType('outgoing');
+      setVideoCallData({
+        callerName: '',
+        callerId: '',
+        channelName: ''
+      });
+      toast.success(`Call ended by ${by?.name || by?.email || 'user'}`);
     };
 
     // Set up video call socket listeners
     if (socketService.socket) {
       console.log('🔌 Setting up video call socket listeners');
-      socketService.socket.on('video_call_invite', handleIncomingCall);
-      socketService.socket.on('video_call_reject', handleCallRejected);
-      
-      // Add a test listener to verify socket events are working
-      socketService.socket.on('test_event', (data) => {
-        console.log('🧪 Test event received:', data);
-        toast.success('Test event received!');
-      });
+      socketService.socket.on('incoming_call', handleIncomingCall);
+      socketService.socket.on('call_accepted', handleCallAccepted);
+      socketService.socket.on('call_rejected', handleCallRejected);
+      socketService.socket.on('call_ended', handleCallEnded);
     } else {
       console.warn('⚠️ Socket not available when setting up video call listeners');
     }
@@ -285,88 +370,15 @@ const Inbox = () => {
       
       // Clean up video call listeners
       if (socketService.socket) {
-        socketService.socket.off('video_call_invite', handleIncomingCall);
-        socketService.socket.off('video_call_reject', handleCallRejected);
-        socketService.socket.off('test_event');
+        socketService.socket.off('incoming_call', handleIncomingCall);
+        socketService.socket.off('call_accepted', handleCallAccepted);
+        socketService.socket.off('call_rejected', handleCallRejected);
+        socketService.socket.off('call_ended', handleCallEnded);
       }
     };
   }, [selectedChat, chats]); // Include chats in dependency for sender name lookup
 
-  // Debug function for testing video calls (accessible from browser console)
-  useEffect(() => {
-    window.debugVideoCall = {
-      testSocket: () => {
-        console.log('🧪 Testing socket connection...');
-        console.log('Socket connected:', socketService.socket?.connected);
-        console.log('Socket ID:', socketService.socket?.id);
-        console.log('Socket URL:', socketService.baseUrl);
-        if (socketService.socket) {
-          socketService.socket.emit('test_event', { message: 'Test from browser console' });
-        }
-      },
-      testVideoCallInvite: (receiverId) => {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const testData = {
-          callerId: user.id,
-          callerName: user.email || 'Test User',
-          receiverId: receiverId || 'test_receiver',
-          channelName: 'test_channel_123'
-        };
-        console.log('🧪 Sending test video call invite:', testData);
-        socketService.socket?.emit('video_call_invite', testData);
-      },
-      getCurrentUser: () => {
-        return JSON.parse(localStorage.getItem('user') || '{}');
-      },
-      getSelectedChat: () => {
-        return selectedChat;
-      },
-      checkSocketListeners: () => {
-        console.log('🔍 Checking socket event listeners...');
-        console.log('Socket events:', socketService.socket?.eventNames());
-        console.log('Video call listeners active:', !!socketService.socket?.listeners('video_call_invite').length);
-      },
-      simulateIncomingCall: () => {
-         const testCallData = {
-           callerId: 'test-caller-id',
-           callerName: 'Test Caller',
-           receiverId: JSON.parse(localStorage.getItem('user') || '{}').id,
-           channelName: 'test_channel_simulation'
-         };
-         console.log('🧪 Simulating incoming call:', testCallData);
-         // Directly trigger the handleIncomingCall function
-         if (socketService.socket) {
-           socketService.socket.emit('video_call_invite', testCallData);
-         }
-       },
-       directTriggerIncomingCall: () => {
-         const testCallData = {
-           callerId: 'direct-test-caller',
-           callerName: 'Direct Test Caller',
-           receiverId: JSON.parse(localStorage.getItem('user') || '{}').id,
-           channelName: 'direct_test_channel'
-         };
-         console.log('🧪 Directly triggering incoming call handler:', testCallData);
-         // Find and directly call the handleIncomingCall function
-         const handleIncomingCall = (callData) => {
-           console.log('📞 Direct incoming call triggered:', callData);
-           setVideoCallData({
-             callerName: callData.callerName || 'Unknown User',
-             callerId: callData.callerId,
-             channelName: callData.channelName
-           });
-           setVideoCallType('incoming');
-           setShowVideoCall(true);
-           toast.success(`Direct test call from ${callData.callerName}`);
-         };
-         handleIncomingCall(testCallData);
-       }
-    };
-    
-    return () => {
-      delete window.debugVideoCall;
-    };
-  }, [selectedChat]);
+
 
   // Function to fetch chat list from API
   const fetchChatList = async () => {
@@ -678,94 +690,40 @@ const Inbox = () => {
     }
 
     try {
-      // Create PDF document
-      const pdf = new jsPDF();
+      toast.loading('Preparing signed document for download...');
       
-      // Add title
-      pdf.setFontSize(20);
-      pdf.text('SIGNED DOCUMENT', 20, 30);
-      
-      // Add document info
-      pdf.setFontSize(12);
-      pdf.text(`Document Name: ${selectedDocument.name}`, 20, 50);
-      pdf.text(`Document ID: ${selectedDocument.id}`, 20, 60);
-      pdf.text(`Document Type: ${selectedDocument.type.toUpperCase()}`, 20, 70);
-      pdf.text(`Signed Date: ${new Date().toLocaleDateString()}`, 20, 80);
-      pdf.text(`Signed Time: ${new Date().toLocaleTimeString()}`, 20, 90);
-      
-      // Add document content section
-      pdf.text('DOCUMENT CONTENT:', 20, 110);
-      
-      if (selectedDocument.type === 'image') {
-        // For images, add the image to PDF
-        try {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            
-            const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            const imgWidth = 150;
-            const imgHeight = (img.height * imgWidth) / img.width;
-            
-            pdf.addImage(imgData, 'JPEG', 20, 120, imgWidth, Math.min(imgHeight, 100));
-            
-            // Add signature
-            addSignatureToPDF(pdf);
-          };
-          
-          img.src = selectedDocument.mediaUrl;
-        } catch (error) {
-          console.error('Error loading image:', error);
-          pdf.text('Image content could not be embedded', 20, 130);
-          pdf.text(`View original: ${selectedDocument.url}`, 20, 140);
-          addSignatureToPDF(pdf);
+      // Sign the original document using the new service
+      const { blob: signedBlob, fileName: signedFileName } = await documentSigningService.signDocument(
+        selectedDocument,
+        signature,
+        {
+          // Optional: customize signature position
+          signatureWidth: 120,
+          signatureHeight: 40
         }
-      } else {
-        // For documents, add reference
-        pdf.text('Document Type: PDF/Document', 20, 130);
-        pdf.text('Original document reference:', 20, 140);
-        pdf.text(selectedDocument.url, 20, 150);
-        addSignatureToPDF(pdf);
-      }
+      );
       
-      function addSignatureToPDF(pdfDoc) {
-        // Add signature section
-        pdfDoc.text('DIGITAL SIGNATURE:', 20, 200);
-        
-        // Add signature image
-        const signatureImg = new Image();
-        signatureImg.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = signatureImg.width;
-          canvas.height = signatureImg.height;
-          ctx.drawImage(signatureImg, 0, 0);
-          
-          const sigData = canvas.toDataURL('image/png');
-          pdfDoc.addImage(sigData, 'PNG', 20, 210, 80, 30);
-          
-          // Add signature line and date
-          pdfDoc.line(20, 250, 100, 250);
-          pdfDoc.text('Digital Signature', 20, 260);
-          pdfDoc.text(`Date: ${new Date().toLocaleDateString()}`, 120, 250);
-          
-          // Save PDF
-          const fileName = `signed_${selectedDocument.name.split('.')[0]}_${Date.now()}.pdf`;
-          pdfDoc.save(fileName);
-          
-          toast.success('Signed document downloaded as PDF!');
-        };
-        signatureImg.src = signature;
-      }
+      // Create download link
+      const downloadUrl = URL.createObjectURL(signedBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = signedFileName;
+      
+      // Trigger download
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
+      
+      toast.dismiss();
+      toast.success(`Signed document downloaded: ${signedFileName}`);
       
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF. Please try again.');
+      console.error('Error downloading signed document:', error);
+      toast.dismiss();
+      toast.error('Failed to download signed document: ' + error.message);
     }
   };
 
@@ -777,22 +735,30 @@ const Inbox = () => {
     }
 
     try {
-      toast.loading('Generating and uploading signed document...');
+      toast.loading('Signing and uploading document...');
       
-      // Generate signed PDF
-      const signedPdfBlob = await generateSignedPDF();
+      // Sign the original document using the new service
+      const { blob: signedBlob, fileName: signedFileName } = await documentSigningService.signDocument(
+        selectedDocument,
+        signature,
+        {
+          // Optional: customize signature position
+          signatureWidth: 120,
+          signatureHeight: 40
+        }
+      );
       
-      // Create a file from the PDF blob
-      const signedFileName = `signed_${selectedDocument.name.split('.')[0]}_${Date.now()}.pdf`;
-      const signedFile = new File([signedPdfBlob], signedFileName, { type: 'application/pdf' });
+      // Determine the correct MIME type based on file extension
+      const mimeType = signedFileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
+      const signedFile = new File([signedBlob], signedFileName, { type: mimeType });
       
-      // Upload the signed PDF
+      // Upload the signed document
       const uploadedSignedDoc = await uploadFile(signedFile);
       
       // Create message content
       const messageContent = `📝 Signed Document: ${selectedDocument.name} (Digitally signed on ${new Date().toLocaleDateString()})`;
       
-      // Send via socket using the signed PDF URL
+      // Send via socket using the signed document URL
       const success = socketService.sendMessage(
         selectedChat.userId,
         messageContent,
@@ -824,117 +790,12 @@ const Inbox = () => {
     } catch (error) {
       console.error('Error sending signed document:', error);
       toast.dismiss();
-      toast.error('Failed to generate or send signed document');
+      toast.error('Failed to sign or send document: ' + error.message);
     }
   };
 
   // Generate signed PDF as blob
-  const generateSignedPDF = async () => {
-    return new Promise((resolve, reject) => {
-      try {
-        // Create PDF document
-        const pdf = new jsPDF();
-        
-        // Add title
-        pdf.setFontSize(20);
-        pdf.text('SIGNED DOCUMENT', 20, 30);
-        
-        // Add document info
-        pdf.setFontSize(12);
-        pdf.text(`Document Name: ${selectedDocument.name}`, 20, 50);
-        pdf.text(`Document ID: ${selectedDocument.id}`, 20, 60);
-        pdf.text(`Document Type: ${selectedDocument.type.toUpperCase()}`, 20, 70);
-        pdf.text(`Signed Date: ${new Date().toLocaleDateString()}`, 20, 80);
-        pdf.text(`Signed Time: ${new Date().toLocaleTimeString()}`, 20, 90);
-        
-        // Add document content section
-        pdf.text('DOCUMENT CONTENT:', 20, 110);
-        
-        if (selectedDocument.type === 'image') {
-          // For images, add the image to PDF
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              canvas.width = img.width;
-              canvas.height = img.height;
-              ctx.drawImage(img, 0, 0);
-              
-              const imgData = canvas.toDataURL('image/jpeg', 0.8);
-              const imgWidth = 150;
-              const imgHeight = (img.height * imgWidth) / img.width;
-              
-              pdf.addImage(imgData, 'JPEG', 20, 120, imgWidth, Math.min(imgHeight, 100));
-              
-              // Add signature
-              addSignatureToPDF(pdf, resolve, reject);
-            } catch (error) {
-              console.error('Error processing image:', error);
-              pdf.text('Image content could not be embedded', 20, 130);
-              pdf.text(`View original: ${selectedDocument.url}`, 20, 140);
-              addSignatureToPDF(pdf, resolve, reject);
-            }
-          };
-          img.onerror = () => {
-            pdf.text('Image content could not be loaded', 20, 130);
-            pdf.text(`Original URL: ${selectedDocument.url}`, 20, 140);
-            addSignatureToPDF(pdf, resolve, reject);
-          };
-          img.src = selectedDocument.mediaUrl;
-        } else {
-          // For documents, add reference
-          pdf.text('Document Type: PDF/Document', 20, 130);
-          pdf.text('Original document reference:', 20, 140);
-          pdf.text(selectedDocument.url, 20, 150);
-          addSignatureToPDF(pdf, resolve, reject);
-        }
-        
-        function addSignatureToPDF(pdfDoc, resolveCallback, rejectCallback) {
-          try {
-            // Add signature section
-            pdfDoc.text('DIGITAL SIGNATURE:', 20, 200);
-            
-            // Add signature image
-            const signatureImg = new Image();
-            signatureImg.onload = () => {
-              try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = signatureImg.width;
-                canvas.height = signatureImg.height;
-                ctx.drawImage(signatureImg, 0, 0);
-                
-                const sigData = canvas.toDataURL('image/png');
-                pdfDoc.addImage(sigData, 'PNG', 20, 210, 80, 30);
-                
-                // Add signature line and date
-                pdfDoc.line(20, 250, 100, 250);
-                pdfDoc.text('Digital Signature', 20, 260);
-                pdfDoc.text(`Date: ${new Date().toLocaleDateString()}`, 120, 250);
-                
-                // Convert PDF to blob
-                const pdfBlob = pdfDoc.output('blob');
-                resolveCallback(pdfBlob);
-              } catch (error) {
-                rejectCallback(error);
-              }
-            };
-            signatureImg.onerror = () => {
-              rejectCallback(new Error('Failed to load signature image'));
-            };
-            signatureImg.src = signature;
-          } catch (error) {
-            rejectCallback(error);
-          }
-        }
-        
-      } catch (error) {
-        reject(error);
-      }
-    });
-  };
+
 
   // Meeting modal functions
   const openMeetingModal = () => {
@@ -973,46 +834,71 @@ const Inbox = () => {
     }
 
     try {
-      // Generate a unique channel name based on user IDs (Agora: max 64 bytes, a-z,A-Z,0-9,!,#,$,%,&,(,),+,-,:,;,<,=,.,>,?,@,[,],^,_,{,},|,~, )
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const userId1 = String(user.id).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-      const userId2 = String(selectedChat.userId).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-      const channelName = `call_${userId1}_${userId2}`.substring(0, 63);
+      
+      // Check if socket is connected
+      if (!socketService.socket?.connected) {
+        toast.error('Not connected to server. Please refresh and try again.');
+        return;
+      }
+      
+      // Check if user data is valid
+      if (!user.id) {
+        toast.error('User authentication required. Please login again.');
+        return;
+      }
       
       console.log('🎥 Starting video call:', {
         caller: user,
         receiver: selectedChat,
-        channelName,
         socketConnected: socketService.socket?.connected
       });
       
+      // Show outgoing call UI
       setVideoCallData({
         callerName: selectedChat.name,
         callerId: selectedChat.userId,
-        channelName: channelName
+        channelName: '' // Will be set when backend responds
       });
       setVideoCallType('outgoing');
       setShowVideoCall(true);
       
-      // Initialize and join the call
-      const success = await videoCallService.joinCall(channelName);
-      if (success) {
-        setVideoCallType('active');
-        // Emit call invitation through socket
-        const callData = {
-          callerId: user.id,
-          callerName: user.email || user.name || 'User',
-          receiverId: selectedChat.userId,
-          channelName: channelName
-        };
+      // Emit start_call event to backend (exact specification)
+      socketService.socket?.emit('start_call', { receiverId: selectedChat.userId }, ({ channelName, token }) => {
+        console.log('📞 Backend response for start_call:', { channelName, token });
+        console.log('hey Hamza is here - start_call response received', token);
         
-        console.log('📤 Emitting video_call_invite:', callData);
-        socketService.socket?.emit('video_call_invite', callData);
-        toast.success('Video call started!');
-      } else {
-        setShowVideoCall(false);
-        toast.error('Failed to start video call');
-      }
+        if (channelName && token) {
+          // Update video call data with backend response
+          setVideoCallData(prev => ({
+            ...prev,
+            channelName: channelName
+          }));
+          
+          // Join Agora channel with token from backend
+          console.log('hamza came here now', channelName);
+          videoCallService.joinCall(channelName, token, user.id)
+            .then(success => {
+              if (success) {
+                console.log('✅ Successfully joined Agora channel');
+                toast.success('Calling...');
+              } else {
+                setShowVideoCall(false);
+                toast.error('Failed to connect to call service');
+              }
+            })
+            .catch(error => {
+              console.error('❌ Failed to join Agora channel:', error);
+              setShowVideoCall(false);
+              toast.error('Failed to connect to call service');
+            });
+        } else {
+          console.error('❌ Invalid response from backend - missing channelName or token');
+          setShowVideoCall(false);
+          toast.error('Failed to initiate call');
+        }
+      });
+      
     } catch (error) {
       console.error('❌ Failed to start video call:', error);
       setShowVideoCall(false);
@@ -1021,22 +907,53 @@ const Inbox = () => {
   };
 
   const handleVideoCallAccept = () => {
-    setVideoCallType('active');
-    toast.success('Call accepted!');
+    // Emit accept_call event to backend (exact specification)
+    socketService.socket?.emit('accept_call', { channelName: videoCallData.channelName }, ({ token }) => {
+      console.log('📞 Backend response for accept_call:', { token });
+      
+      if (token) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        // Join Agora channel with token from backend
+        videoCallService.joinCall(videoCallData.channelName, token, user.id)
+          .then(success => {
+            if (success) {
+              setVideoCallType('active');
+              toast.success('Call accepted!');
+            } else {
+              setShowVideoCall(false);
+              toast.error('Failed to connect to call');
+            }
+          })
+          .catch(error => {
+            console.error('❌ Failed to join call after accepting:', error);
+            setShowVideoCall(false);
+            toast.error('Failed to connect to call');
+          });
+      } else {
+        console.error('❌ Invalid response from backend - missing token');
+        setShowVideoCall(false);
+        toast.error('Failed to accept call');
+      }
+    });
   };
 
   const handleVideoCallReject = () => {
     setShowVideoCall(false);
-    // Emit call rejection through socket
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    socketService.socket?.emit('video_call_reject', {
-      callerId: videoCallData.callerId,
-      receiverId: user.id
-    });
+    // Emit reject_call event to backend
+    socketService.socket?.emit('reject_call', { from: videoCallData.callerId });
     toast.success('Call rejected');
   };
 
   const handleVideoCallEnd = () => {
+    // Emit end_call event to backend
+    if (videoCallData.channelName) {
+      socketService.socket?.emit('end_call', { channelName: videoCallData.channelName });
+    }
+    
+    // Leave Agora call
+    videoCallService.leaveCall();
+    
+    // Reset UI state
     setShowVideoCall(false);
     setVideoCallType('outgoing');
     setVideoCallData({
@@ -1044,6 +961,8 @@ const Inbox = () => {
       callerId: '',
       channelName: ''
     });
+    
+    toast.success('Call ended');
   };
 
   const handleMeetingInputChange = (field, value) => {
@@ -1123,6 +1042,29 @@ const Inbox = () => {
       sendMessage();
     }
   };
+
+  // Handle emoji selection
+  const handleEmojiSelect = (emojiObject) => {
+    setNewMessage(prev => prev + emojiObject.emoji);
+    setShowEmojiPicker(false);
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   return (
     <div className="w-full h-full flex bg-transparent px-0 md:px-6 py-6 overflow-hidden">
@@ -1277,7 +1219,9 @@ const Inbox = () => {
                        <div className="flex items-center gap-3">
                          <FaFilePdf className={`text-xl ${msg.fromMe ? 'text-red-600' : 'text-red-400'}`} />
                          <div className="flex-1">
-                           <div className={`font-semibold ${msg.fromMe ? 'text-black' : 'text-white'}`}>{msg.fileName}</div>
+                           <div className={`font-semibold ${msg.fromMe ? 'text-black' : 'text-white'}`}>
+                             {msg.mediaUrl ? extractFilenameFromUrl(msg.mediaUrl) : (msg.fileName || 'Document')}
+                           </div>
                            <div className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>{msg.fileSize}</div>
                          </div>
                          <div className="flex flex-col items-end gap-1">
@@ -1304,13 +1248,17 @@ const Inbox = () => {
                            <div className="flex items-center gap-3">
                              <FaImage className={`text-xl ${msg.fromMe ? 'text-blue-600' : 'text-blue-400'}`} />
                              <div className="flex-1">
-                               <div className={`font-semibold ${msg.fromMe ? 'text-black' : 'text-white'}`}>{msg.fileName}</div>
+                               <div className={`font-semibold ${msg.fromMe ? 'text-black' : 'text-white'}`}>
+                                 {msg.mediaUrl ? extractFilenameFromUrl(msg.mediaUrl) : (msg.fileName || 'Image')}
+                               </div>
                                <div className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>{msg.fileSize}</div>
                              </div>
                            </div>
                          )}
                          <div className="flex items-center justify-between">
-                           <span className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>{msg.fileName}</span>
+                           <span className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>
+                             {msg.mediaUrl ? extractFilenameFromUrl(msg.mediaUrl) : (msg.fileName || 'Image')}
+                           </span>
                            <span className={`text-xs font-medium ${msg.fromMe ? 'text-black/70' : 'text-gray-400'} whitespace-nowrap`}>{msg.time}</span>
                          </div>
                        </div>
@@ -1330,13 +1278,17 @@ const Inbox = () => {
                            <div className="flex items-center gap-3">
                              <FaPlay className={`text-xl ${msg.fromMe ? 'text-green-600' : 'text-green-400'}`} />
                              <div className="flex-1">
-                               <div className={`font-semibold ${msg.fromMe ? 'text-black' : 'text-white'}`}>{msg.fileName}</div>
+                               <div className={`font-semibold ${msg.fromMe ? 'text-black' : 'text-white'}`}>
+                                 {msg.mediaUrl ? extractFilenameFromUrl(msg.mediaUrl) : (msg.fileName || 'Video')}
+                               </div>
                                <div className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>{msg.fileSize}</div>
                              </div>
                            </div>
                          )}
                          <div className="flex items-center justify-between">
-                           <span className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>{msg.fileName}</span>
+                           <span className={`text-xs ${msg.fromMe ? 'text-black/70' : 'text-gray-400'}`}>
+                             {msg.mediaUrl ? extractFilenameFromUrl(msg.mediaUrl) : (msg.fileName || 'Video')}
+                           </span>
                            <span className={`text-xs font-medium ${msg.fromMe ? 'text-black/70' : 'text-gray-400'} whitespace-nowrap`}>{msg.time}</span>
                          </div>
                        </div>
@@ -1404,6 +1356,33 @@ const Inbox = () => {
               placeholder="Type your message here..."
               className="flex-1 bg-transparent border border-[#9afa00]/30 rounded-xl px-4 md:px-5 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 focus:border-[#9afa00] text-sm md:text-base transition-all"
             />
+            
+            {/* Emoji Picker Button */}
+            <div className="relative" ref={emojiPickerRef}>
+              <button
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20"
+              >
+                <FaSmile className="text-[#9afa00] text-lg" />
+              </button>
+              
+              {/* Emoji Picker */}
+              {showEmojiPicker && (
+                <div className="absolute bottom-full right-0 mb-2 z-50">
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiSelect}
+                    theme="dark"
+                    width={300}
+                    height={400}
+                    searchDisabled={false}
+                    skinTonesDisabled={false}
+                    previewConfig={{
+                      showPreview: false
+                    }}
+                  />
+                </div>
+              )}
+            </div>
             
             <input
               type="file"

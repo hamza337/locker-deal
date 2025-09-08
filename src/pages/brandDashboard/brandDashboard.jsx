@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BrandDashboardHome from '../../components/brand/BrandDashboardHome';
 import BrandAthlete from '../../components/brand/BrandAthlete';
 import BrandCompaigns from '../../components/brand/BrandCompaigns';
@@ -9,6 +10,7 @@ const TABS = [
   { label: 'Athlete', key: 'athlete' },
   { label: 'Campaigns', key: 'campaigns' },
   { label: 'Contracts', key: 'contracts' },
+  { label: 'Chats', key: 'chats' },
 ];
 
 const TAB_COMPONENTS = {
@@ -20,6 +22,15 @@ const TAB_COMPONENTS = {
 
 const BrandDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const navigate = useNavigate();
+
+  const handleTabClick = (tabKey) => {
+    if (tabKey === 'chats') {
+      navigate('/chats');
+    } else {
+      setActiveTab(tabKey);
+    }
+  };
 
   return (
     <div className="w-full min-h-screen bg-transparent px-0 md:px-6 py-6">
@@ -28,7 +39,7 @@ const BrandDashboard = () => {
         {TABS.map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabClick(tab.key)}
             className={`uppercase font-bold text-white text-base md:text-lg px-2 pb-2 border-b-4 transition-all duration-200 min-w-max ${activeTab === tab.key ? 'text-[#9afa00] border-[#9afa00]' : 'border-transparent hover:text-[#9afa00]'}`}
           >
             {tab.label}

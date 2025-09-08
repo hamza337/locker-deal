@@ -18,6 +18,11 @@ const VideoCall = ({
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [callDuration, setCallDuration] = useState(0);
+
+  // Sync callState with callType prop changes
+  useEffect(() => {
+    setCallState(callType);
+  }, [callType]);
   
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
@@ -118,14 +123,13 @@ const VideoCall = ({
   const handleAcceptCall = async () => {
     try {
       setCallState('connecting');
-      const success = await videoCallService.joinCall(channelName);
-      if (success) {
-        setCallState('active');
-        if (onAccept) onAccept();
-        toast.success('Call connected!');
+      // Call the onAccept callback which handles backend communication and token retrieval
+      if (onAccept) {
+        onAccept();
       } else {
+        console.error('❌ No onAccept callback provided');
         setCallState('ended');
-        toast.error('Failed to connect call');
+        toast.error('Failed to accept call - no callback');
       }
     } catch (error) {
       console.error('❌ Failed to accept call:', error);

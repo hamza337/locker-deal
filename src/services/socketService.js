@@ -138,6 +138,16 @@ class SocketService {
       console.log('🔴 User went offline:', data);
     });
 
+    // Listen for exception events from backend
+    this.socket.on('exception', (error) => {
+      console.error('🚨 Backend exception:', error);
+      if (error && error.message) {
+        toast.error(`Server Error: ${error.message}`);
+      } else {
+        toast.error('An error occurred on the server');
+      }
+    });
+
     // Listen for any unhandled events (debugging)
     this.socket.onAny((eventName, ...args) => {
       console.log(`🔍 Received event '${eventName}':`, args);

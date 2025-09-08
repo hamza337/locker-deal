@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaRunning, FaTrophy, FaUserPlus, FaHandshake, FaBell } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 
@@ -16,7 +16,8 @@ const messages = [
   { sender: 'Taylor', message: 'Sent an offer.', time: '1 day ago', badge: 1 },
 ];
 
-const statCards = [
+// Static data - will be replaced with dynamic data later
+const getStatCards = (followersCount) => [
   {
     icon: <FaRunning className="text-[#9afa00] text-3xl" />, label: 'MATCHES PLAYED', value: '34',
   },
@@ -24,7 +25,7 @@ const statCards = [
     icon: <FaTrophy className="text-[#9afa00] text-3xl" />, label: 'WIN RATE', value: '68%',
   },
   {
-    icon: <FaUserPlus className="text-[#9afa00] text-3xl" />, label: 'FOLLOWERS', value: '12.4K',
+    icon: <FaUserPlus className="text-[#9afa00] text-3xl" />, label: 'FOLLOWERS', value: followersCount,
   },
   {
     icon: <FaHandshake className="text-[#9afa00] text-3xl" />, label: 'BRAND DEALS', value: <><span>5</span> <span className="text-[#9afa00] text-lg font-bold ml-1">ACTIVE</span></>,
@@ -32,16 +33,64 @@ const statCards = [
 ];
 
 const AthleteDashboardHome = () => {
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    // Get user data from localStorage
+    const user = localStorage.getItem('user');
+    if (user) {
+      setUserData(JSON.parse(user));
+    }
+  }, []);
+
+  // Get user's first name for greeting
+  const getFirstName = () => {
+    if (userData?.athleteProfile?.firstName) {
+      return userData.athleteProfile.firstName;
+    }
+    return 'Athlete'; // Fallback
+  };
+
+  // Get user's full name for greeting
+  const getFullName = () => {
+    if (userData?.athleteProfile?.firstName && userData?.athleteProfile?.lastName) {
+      return `${userData.athleteProfile.firstName} ${userData.athleteProfile.lastName}`;
+    }
+    return 'Athlete'; // Fallback
+  };
+
+  // Get user's followers count
+  const getFollowersCount = () => {
+    if (userData?.athleteProfile?.followersCount) {
+      const count = userData.athleteProfile.followersCount;
+      if (count >= 1000000) {
+        return `${(count / 1000000).toFixed(1)}M`;
+      } else if (count >= 1000) {
+        return `${(count / 1000).toFixed(1)}K`;
+      }
+      return count.toString();
+    }
+    return '0';
+  };
+
+  // Get user's achievements
+  const getUserAchievements = () => {
+    if (userData?.athleteProfile?.achievements) {
+      return userData.athleteProfile.achievements;
+    }
+    return 'No achievements yet';
+  };
+
   return (
     <>
       
       <div className="min-h-screen w-full bg-cover bg-center px-2 md:px-8 py-4" style={{ backgroundImage: "url('/bgApp.png')" }}>
         {/* Greeting */}
-        <h2 className="text-white text-xl md:text-3xl font-bold mb-6 flex items-center gap-2">Hi, Pawas Aurora <span className="text-2xl">👋</span></h2>
+        <h2 className="text-white text-xl md:text-3xl font-bold mb-6 flex items-center gap-2">Hi, {getFullName()} <span className="text-2xl">👋</span></h2>
 
         {/* Stat Cards - responsive */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
-          {statCards.map((card, idx) => (
+          {getStatCards(getFollowersCount()).map((card, idx) => (
             <div
               key={card.label}
               className="border border-[#9afa00] rounded-xl flex flex-col items-center min-w-0 px-4 md:px-8 py-4 md:py-6 bg-[rgba(0,0,0,0.3)]"
@@ -102,12 +151,12 @@ const AthleteDashboardHome = () => {
             <span className="text-white font-bold text-lg md:text-xl mb-2">ACHIEVEMENTS</span>
             <div className="flex flex-col md:flex-row gap-4 mt-4">
               <div className="flex flex-col items-center justify-center bg-[rgba(0,0,0,0.3)] rounded-lg p-4 md:p-6 flex-1">
-                <span className="text-white font-bold mb-2">MVP 2024</span>
+                <span className="text-white font-bold mb-2 text-center">{getUserAchievements()}</span>
                 <span className="text-5xl">🏆</span>
               </div>
               <div className="flex flex-col items-center justify-center bg-[rgba(0,0,0,0.3)] rounded-lg p-4 md:p-6 flex-1">
-                <span className="text-white font-bold mb-2">Best Player 2025</span>
-                <span className="text-5xl">🏅</span>
+                <span className="text-white font-bold mb-2">Profile Type</span>
+                <span className="text-[#9afa00] font-bold text-lg">{userData?.athleteProfile?.profileType || 'Professional'}</span>
               </div>
             </div>
           </div>
@@ -153,4 +202,4 @@ const AthleteDashboardHome = () => {
   );
 };
 
-export default AthleteDashboardHome; 
+export default AthleteDashboardHome;
