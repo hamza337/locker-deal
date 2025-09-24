@@ -25,7 +25,7 @@ jobs:
           sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no $USER@$HOST "
             echo 'Setting up environment...'
 
-            export APP_DIR=\$HOME/lockerai-frontend
+            export APP_DIR=\$HOME/locker-deal
 
             cd ~
             echo 'Checking if repo exists and is valid...'
