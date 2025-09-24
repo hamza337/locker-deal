@@ -93,12 +93,25 @@ const Inbox = () => {
   // Emoji picker states
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
+  // GPT toggle state (only for athletes)
+  const [gptEnabled, setGptEnabled] = useState(false);
+  const [isAthlete, setIsAthlete] = useState(false);
+  
   const canvasRef = useRef(null);
   const documentRef = useRef(null);
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
+
+  // Check user type on component mount
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      const userData = JSON.parse(user);
+      setIsAthlete(userData.role === 'athlete');
+    }
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1066,6 +1079,29 @@ const Inbox = () => {
     };
   }, [showEmojiPicker]);
 
+  // Handle GPT toggle
+  const handleGptToggle = () => {
+    const newGptState = !gptEnabled;
+    setGptEnabled(newGptState);
+    
+    // Emit socket event to toggle GPT
+    if (socketService.socket?.connected) {
+      socketService.socket.emit('toggle_gpt', { enabled: newGptState }, (resp) => {
+        console.log('GPT toggled:', resp);
+        if (resp && resp.gptEnabled) {
+          toast.success(`GPT auto-replies ${newGptState ? 'enabled' : 'disabled'}`);
+        } else {
+          // Revert state if failed
+          setGptEnabled(!newGptState);
+          toast.error('Failed to toggle GPT. Please try again.');
+        }
+      });
+    } else {
+      toast.error('Not connected to chat server');
+      setGptEnabled(!newGptState); // Revert state
+    }
+  };
+
   return (
     <div className="w-full h-full flex bg-transparent px-0 md:px-6 py-6 overflow-hidden">
       <div className="w-full max-w-6xl h-[80vh] bg-[rgba(0,0,0,0.3)] rounded-2xl flex flex-col md:flex-row overflow-hidden shadow-lg min-w-0 mx-auto gap-0">
@@ -1153,6 +1189,20 @@ const Inbox = () => {
               )}
             </div>
             <div className="flex items-center gap-3">
+              {/* GPT Toggle Button (only for athletes) */}
+              {isAthlete && (
+                <button 
+                  onClick={handleGptToggle}
+                  className={`p-3 rounded-full transition-all duration-200 border ${
+                    gptEnabled 
+                      ? 'bg-gradient-to-r from-[#9afa00]/20 to-[#7dd800]/20 border-[#9afa00] text-[#9afa00]' 
+                      : 'bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] border-[#9afa00]/20 text-gray-400 hover:text-[#9afa00]'
+                  }`}
+                  title={`GPT Auto-replies ${gptEnabled ? 'Enabled' : 'Disabled'}`}
+                >
+                  <FaRobot className="text-lg" />
+                </button>
+              )}
               {selectedChat && (
                 <button 
                   onClick={startVideoCall}
