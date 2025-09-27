@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo, FaSmile } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import { getChatList, getChatHistory } from '../../services/chatService';
@@ -10,11 +10,39 @@ import { createMeeting, validateMeetingData, getDefaultMeetingTimes } from '../.
 import VideoCall from '../../components/chat/VideoCall';
 import videoCallService from '../../services/videoCallService';
 import documentSigningService from '../../services/documentSigningService';
+import subscriptionService from '../../services/subscriptionService';
 import toast from 'react-hot-toast';
 
 // Dynamic documents will be fetched from API
 
 const Inbox = () => {
+  // Check if user has access to chat functionality
+  const user = localStorage.getItem('user');
+  if (user) {
+    const userData = JSON.parse(user);
+    if (userData.role === 'brand' && !subscriptionService.checkFeatureAccess('chat')) {
+      // Show subscription popup and prevent access
+      setTimeout(() => {
+        subscriptionService.showRestrictionPopup('chat');
+      }, 100);
+      
+      return (
+        <div className="w-full min-h-screen bg-transparent flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">Chat Access Restricted</h2>
+            <p className="text-gray-400 mb-6">Please upgrade your subscription to access chat functionality.</p>
+            <button
+              onClick={() => subscriptionService.showRestrictionPopup('chat')}
+              className="bg-[#9afa00] text-black font-bold px-6 py-3 rounded-lg hover:bg-[#baff32] transition"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        </div>
+      );
+    }
+  }
+
   // Helper function to extract filename from S3 URL and apply ellipsis
   const extractFilenameFromUrl = (url, maxLength = 30) => {
     if (!url) return 'Unknown file';
@@ -52,6 +80,7 @@ const Inbox = () => {
     }
   };
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -104,7 +133,7 @@ const Inbox = () => {
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
 
-  // Check user type on component mount
+  // Check user type and subscription access on component mount
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (user) {
@@ -500,6 +529,11 @@ const Inbox = () => {
   // Send message function
   const sendMessage = () => {
     if (newMessage.trim() && selectedChat) {
+      // Check subscription access for brand users
+      if (!subscriptionService.validateAccess('chat')) {
+        return;
+      }
+      
       // Send message via socket
       const success = socketService.sendMessage(selectedChat.userId, newMessage);
       

@@ -15,6 +15,9 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Inbox from './pages/inbox/Inbox';
 import BrandDashboard from './pages/brandDashboard/brandDashboard';
 import SocketTest from './components/SocketTest';
+import SubscriptionPopup from './components/subscription/SubscriptionPopup';
+import PaymentSuccess from './pages/payment/PaymentSuccess';
+import EmailTemplateDemo from './pages/demo/EmailTemplateDemo';
 
 // Role-based Private Route Component
 const PrivateRoute = ({ children, allowedRoles = [] }) => {
@@ -99,7 +102,6 @@ const App = () => {
 
   return (
     <BrowserRouter>
-      <Toaster />
       <Routes>
         {/* Public Routes - Auth related */}
         <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
@@ -110,6 +112,7 @@ const App = () => {
         <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
         <Route path="/otp-verification" element={<PublicRoute><OtpVerification /></PublicRoute>} />
         <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+        <Route path="/payment/success" element={<PrivateRoute allowedRoles={['athlete', 'brand']}><PaymentSuccess /></PrivateRoute>} />
         
         {/* Private Routes - Role-based Protection */}
         {/* Athlete-only routes */}
@@ -149,7 +152,16 @@ const App = () => {
             </PrivateRoute>
           } 
         />
+        
+        {/* Demo Routes */}
+        <Route 
+          path="/demo/email-template" 
+          element={<EmailTemplateDemo />}
+        />
       </Routes>
+      {/* Global Components */}
+      <Toaster position="top-right" />
+      <SubscriptionPopup />
     </BrowserRouter>
   );
 };

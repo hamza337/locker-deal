@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaEye, FaTimes, FaDollarSign, FaCalendarAlt, FaFlag } from 'react-icons/fa';
 import toast from 'react-hot-toast';
-import { createCampaign, getAllCampaigns, updateCampaign, deleteCampaign } from '../../services/campaignService';
+// import { createCampaign, getAllCampaigns, updateCampaign, deleteCampaign } from '../../services/campaignService';
+import subscriptionService from '../../services/subscriptionService';
+import { createCampaign, deleteCampaign, getAllCampaigns, updateCampaign } from '../../services/campaignservice';
 
 const CAMPAIGN_STATUSES = {
   OPEN: 'OPEN',
@@ -52,6 +54,10 @@ const BrandCompaigns = () => {
   };
 
   const handleCreateCampaign = () => {
+    // Check subscription access for campaign creation
+    if (!subscriptionService.validateAccess('campaign')) {
+      return;
+    }
     setModalMode('create');
     setFormData({ title: '', description: '', budget: '', sport: '', status: CAMPAIGN_STATUSES.OPEN, isAnonymous: false });
     setIsModalOpen(true);
@@ -185,10 +191,20 @@ const BrandCompaigns = () => {
           <p className="text-gray-400 text-lg">Manage your marketing campaigns and sponsorship opportunities</p>
         </div>
         <button
-          onClick={handleCreateCampaign}
-          className="flex items-center gap-2 bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black font-bold px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-[#9afa00]/25 transition-all duration-200 transform hover:scale-105"
+          onClick={() => {
+            if (subscriptionService.checkFeatureAccess('campaigns')) {
+              handleCreateCampaign();
+            } else {
+              subscriptionService.showRestrictionPopup('campaigns');
+            }
+          }}
+          className={`flex items-center gap-2 font-bold px-6 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
+            subscriptionService.checkFeatureAccess('campaigns')
+              ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black hover:shadow-lg hover:shadow-[#9afa00]/25 transform hover:scale-105'
+              : 'bg-gray-500 text-gray-300 opacity-60 hover:opacity-80'
+          }`}
         >
-          <FaPlus /> Create Campaign
+          <FaPlus /> {subscriptionService.checkFeatureAccess('campaigns') ? 'Create Campaign' : 'Upgrade to Create'}
         </button>
       </div>
 
@@ -274,10 +290,20 @@ const BrandCompaigns = () => {
               <h3 className="text-2xl font-bold text-white mb-2">No Campaigns Yet</h3>
               <p className="text-gray-400 mb-6">Create your first campaign to start reaching athletes</p>
               <button
-                onClick={handleCreateCampaign}
-                className="bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black font-bold px-8 py-3 rounded-xl hover:shadow-lg hover:shadow-[#9afa00]/25 transition-all duration-200"
+                onClick={() => {
+                  if (subscriptionService.checkFeatureAccess('campaigns')) {
+                    handleCreateCampaign();
+                  } else {
+                    subscriptionService.showRestrictionPopup('campaigns');
+                  }
+                }}
+                className={`font-bold px-8 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
+                  subscriptionService.checkFeatureAccess('campaigns')
+                    ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black hover:shadow-lg hover:shadow-[#9afa00]/25'
+                    : 'bg-gray-500 text-gray-300 opacity-60 hover:opacity-80'
+                }`}
               >
-                Create Your First Campaign
+                {subscriptionService.checkFeatureAccess('campaign') ? 'Create Your First Campaign' : 'Upgrade to Create Campaigns'}
               </button>
             </div>
           )}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getAllAthletes } from '../../services/athleteService';
 import socketService from '../../services/socketService';
+import subscriptionService from '../../services/subscriptionService';
 
 const athletes = [
   {
@@ -381,13 +382,22 @@ const BrandAthlete = () => {
                     
                     {/* View Profile Button */}
                     <button 
-                      className="w-full bg-[#9afa00] text-black font-bold py-2.5 rounded-md uppercase text-xs md:text-sm hover:bg-[#baff32] transition-all duration-200 shadow-md hover:shadow-lg"
+                      className={`w-full font-bold py-2.5 rounded-md uppercase text-xs md:text-sm transition-all duration-200 shadow-md cursor-pointer ${
+                        subscriptionService.checkFeatureAccess('athlete_page') 
+                          ? 'bg-[#9afa00] text-black hover:bg-[#baff32] hover:shadow-lg'
+                          : 'bg-gray-500 text-gray-300 opacity-60 hover:opacity-80'
+                      }`}
                       onClick={() => {
-                        setSelectedAthlete(athlete);
-                        setShowAthleteModal(true);
+                        // Check subscription access for brand users
+                        if (subscriptionService.checkFeatureAccess('athlete_page')) {
+                          setSelectedAthlete(athlete);
+                          setShowAthleteModal(true);
+                        } else {
+                          subscriptionService.showRestrictionPopup('athlete_page');
+                        }
                       }}
                     >
-                      View Profile
+                      {subscriptionService.checkFeatureAccess('athlete_page') ? 'View Profile' : 'Upgrade to View'}
                     </button>
                   </div>
                 </div>
@@ -763,13 +773,22 @@ const BrandAthlete = () => {
                   Close
                 </button>
                 <button
-                  className="flex-1 bg-[#9afa00] text-black font-bold py-3 rounded-md uppercase text-sm hover:bg-[#baff32] transition"
+                  className={`flex-1 font-bold py-3 rounded-md uppercase text-sm transition cursor-pointer ${
+                    subscriptionService.checkFeatureAccess('chat')
+                      ? 'bg-[#9afa00] text-black hover:bg-[#baff32]'
+                      : 'bg-gray-500 text-gray-300 opacity-60 hover:opacity-80'
+                  }`}
                   onClick={() => {
-                    navigate('/chats', { state: { selectedAthleteId: selectedAthlete.id, selectedAthleteName: selectedAthlete.athleteProfile?.fullName || selectedAthlete.email } });
-                    toast.success('Opening chat with athlete...');
+                    // Check subscription access for chat functionality
+                    if (subscriptionService.checkFeatureAccess('chat')) {
+                      navigate('/chats', { state: { selectedAthleteId: selectedAthlete.id, selectedAthleteName: selectedAthlete.athleteProfile?.fullName || selectedAthlete.email } });
+                      toast.success('Opening chat with athlete...');
+                    } else {
+                      subscriptionService.showRestrictionPopup('chat');
+                    }
                   }}
                 >
-                  Start Chat
+                  {subscriptionService.checkFeatureAccess('chat') ? 'Start Chat' : 'Upgrade to Chat'}
                 </button>
               </div>
             </div>
