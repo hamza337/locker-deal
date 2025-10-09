@@ -7,25 +7,8 @@ class SubscriptionService {
 
   // Check if user has access to a feature
   checkFeatureAccess(feature) {
-    const user = this.getCurrentUser();
-    if (!user || user.role !== 'brand') {
-      return true; // Non-brand users have full access
-    }
-
-    const subscriptionPlan = user.subscriptionPlan || 'FREEMIUM';
-    
-    // Define feature restrictions for freemium users
-    const freemiumRestrictions = [
-      'chat',
-      'athlete_page',
-      'campaigns',
-      'direct_message'
-    ];
-
-    if (subscriptionPlan === 'FREEMIUM' && freemiumRestrictions.includes(feature)) {
-      return false;
-    }
-
+    // All users now have access to all features regardless of subscription plan
+    // Subscription plans now only differ in rates, not feature access
     return true;
   }
 
@@ -40,10 +23,15 @@ class SubscriptionService {
     }
   }
 
-  // Check if user is freemium brand
-  isFreemiumBrand() {
+  // Check if user is pay per deal brand (default subscription)
+  isPayPerDealBrand() {
     const user = this.getCurrentUser();
-    return user && user.role === 'brand' && (user.subscriptionPlan === 'FREEMIUM' || !user.subscriptionPlan);
+    return user && user.role === 'brand' && (user.subscriptionPlan === 'PAY_PER_DEAL' || !user.subscriptionPlan);
+  }
+
+  // Legacy method for backward compatibility - now always returns false since FREEMIUM no longer exists
+  isFreemiumBrand() {
+    return false;
   }
 
   // Handle subscription checkout

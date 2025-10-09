@@ -54,10 +54,7 @@ const BrandCompaigns = () => {
   };
 
   const handleCreateCampaign = () => {
-    // Check subscription access for campaign creation
-    if (!subscriptionService.validateAccess('campaign')) {
-      return;
-    }
+    // All users now have access to campaign creation regardless of subscription plan
     setModalMode('create');
     setFormData({ title: '', description: '', budget: '', sport: '', status: CAMPAIGN_STATUSES.OPEN, isAnonymous: false });
     setIsModalOpen(true);
@@ -156,7 +153,7 @@ const BrandCompaigns = () => {
           // Refresh campaigns list
           fetchCampaigns();
         } else {
-          toast.info('No changes detected');
+          toast.success('No changes detected');
         }
       }
       setIsModalOpen(false);
@@ -191,20 +188,10 @@ const BrandCompaigns = () => {
           <p className="text-gray-400 text-lg">Manage your marketing campaigns and sponsorship opportunities</p>
         </div>
         <button
-          onClick={() => {
-            if (subscriptionService.checkFeatureAccess('campaigns')) {
-              handleCreateCampaign();
-            } else {
-              subscriptionService.showRestrictionPopup('campaigns');
-            }
-          }}
-          className={`flex items-center gap-2 font-bold px-6 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
-            subscriptionService.checkFeatureAccess('campaigns')
-              ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black hover:shadow-lg hover:shadow-[#9afa00]/25 transform hover:scale-105'
-              : 'bg-gray-500 text-gray-300 opacity-60 hover:opacity-80'
-          }`}
+          onClick={handleCreateCampaign}
+          className="flex items-center gap-2 font-bold px-6 py-3 rounded-xl transition-all duration-200 cursor-pointer bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black hover:shadow-lg hover:shadow-[#9afa00]/25 transform hover:scale-105"
         >
-          <FaPlus /> {subscriptionService.checkFeatureAccess('campaigns') ? 'Create Campaign' : 'Upgrade to Create'}
+          <FaPlus /> Create Campaign
         </button>
       </div>
 
@@ -290,20 +277,10 @@ const BrandCompaigns = () => {
               <h3 className="text-2xl font-bold text-white mb-2">No Campaigns Yet</h3>
               <p className="text-gray-400 mb-6">Create your first campaign to start reaching athletes</p>
               <button
-                onClick={() => {
-                  if (subscriptionService.checkFeatureAccess('campaigns')) {
-                    handleCreateCampaign();
-                  } else {
-                    subscriptionService.showRestrictionPopup('campaigns');
-                  }
-                }}
-                className={`font-bold px-8 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
-                  subscriptionService.checkFeatureAccess('campaigns')
-                    ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black hover:shadow-lg hover:shadow-[#9afa00]/25'
-                    : 'bg-gray-500 text-gray-300 opacity-60 hover:opacity-80'
-                }`}
+                onClick={handleCreateCampaign}
+                className="font-bold px-8 py-3 rounded-xl transition-all duration-200 cursor-pointer bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black hover:shadow-lg hover:shadow-[#9afa00]/25"
               >
-                {subscriptionService.checkFeatureAccess('campaign') ? 'Create Your First Campaign' : 'Upgrade to Create Campaigns'}
+                Create Your First Campaign
               </button>
             </div>
           )}

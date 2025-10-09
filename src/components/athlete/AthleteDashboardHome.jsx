@@ -48,7 +48,7 @@ const AthleteDashboardHome = () => {
     if (userData?.athleteProfile?.firstName) {
       return userData.athleteProfile.firstName;
     }
-    return 'Athlete'; // Fallback
+    return 'Professional Athlete'; // Fallback
   };
 
   // Get user's full name for greeting
@@ -56,7 +56,7 @@ const AthleteDashboardHome = () => {
     if (userData?.athleteProfile?.firstName && userData?.athleteProfile?.lastName) {
       return `${userData.athleteProfile.firstName} ${userData.athleteProfile.lastName}`;
     }
-    return 'Athlete'; // Fallback
+    return 'Professional Athlete'; // Fallback
   };
 
   // Get user's followers count

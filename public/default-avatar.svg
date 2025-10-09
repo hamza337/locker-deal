@@ -1,0 +1,12 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="100" fill="#2D3748"/>
+  
+  <!-- Professional User Icon -->
+  <circle cx="100" cy="75" r="25" fill="#9afa00"/>
+  <path d="M100 110 C85 110, 70 120, 70 135 L70 150 C70 155, 75 160, 80 160 L120 160 C125 160, 130 155, 130 150 L130 135 C130 120, 115 110, 100 110 Z" fill="#9afa00"/>
+  
+  <!-- Professional Touch - Tie -->
+  <rect x="95" y="100" width="10" height="30" fill="#1A202C"/>
+  <polygon points="95,100 105,100 102,95 98,95" fill="#1A202C"/>
+</svg>

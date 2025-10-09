@@ -15,6 +15,22 @@ class VideoCallService {
     this.userListeners = [];
   }
 
+
+  // Check device availability
+  async checkDeviceAvailability() {
+    try {
+      const devices = await AgoraRTC.getDevices();
+      const hasCamera = devices.some(device => device.kind === 'videoinput');
+      const hasMicrophone = devices.some(device => device.kind === 'audioinput');
+      
+      console.log('📱 Device availability:', { hasCamera, hasMicrophone });
+      return { hasCamera, hasMicrophone };
+    } catch (error) {
+      console.error('❌ Failed to check device availability:', error);
+      return { hasCamera: false, hasMicrophone: false };
+    }
+  }
+
   // Initialize Agora client
   async initializeClient() {
     try {
@@ -70,17 +86,34 @@ class VideoCallService {
       console.log('🔧 Using token:', token ? 'Token provided' : 'No token');
       console.log('🔧 App ID:', this.appId);
 
+      // Check device availability before joining
+      const { hasCamera, hasMicrophone } = await this.checkDeviceAvailability();
+      
+      if (!hasCamera && !hasMicrophone) {
+        toast.error('No camera or microphone detected. Please connect devices and try again.');
+        return false;
+      }
+      
+      // Show informative messages about available devices
+      if (!hasCamera && hasMicrophone) {
+        toast.error('No camera detected. Joining with audio only.');
+      } else if (hasCamera && !hasMicrophone) {
+        toast.error('No microphone detected. Joining with video only.');
+      }
+
       // Use original channel name since token is generated for it
       // Note: If channel name is too long, the backend should handle sanitization
       const assignedUid = await this.client.join(this.appId, channelName, token, uid);
       console.log('✅ Joined channel:', channelName, 'with UID:', assignedUid);
       
       // Create and publish local tracks
-      await this.createLocalTracks();
-      await this.publishLocalTracks();
+      const tracksCreated = await this.createLocalTracks();
+      if (tracksCreated) {
+        await this.publishLocalTracks();
+      }
       
       this.isJoined = true;
-      toast.success('Joined video call successfully!');
+      // Toast message handled by calling component
       return assignedUid;
     } catch (error) {
       console.error('❌ Failed to join call:', error);
@@ -121,15 +154,53 @@ class VideoCallService {
     }
   }
 
-  // Create local audio and video tracks
+  // Create local audio and video tracks based on available devices
   async createLocalTracks() {
     try {
-      [this.localAudioTrack, this.localVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
-      console.log('✅ Local tracks created successfully');
-      return true;
+      // Check device availability first to avoid unnecessary errors
+      const { hasCamera, hasMicrophone } = await this.checkDeviceAvailability();
+      
+      let audioSuccess = false;
+      let videoSuccess = false;
+      
+      // Only attempt to create tracks for available devices
+      if (hasMicrophone) {
+        try {
+          this.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+          audioSuccess = true;
+          console.log('✅ Audio track created successfully');
+        } catch (audioError) {
+          console.error('❌ Failed to create audio track:', audioError);
+          this.localAudioTrack = null;
+        }
+      } else {
+        console.log('ℹ️ Skipping audio track creation - no microphone detected');
+        this.localAudioTrack = null;
+      }
+      
+      if (hasCamera) {
+        try {
+          this.localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+          videoSuccess = true;
+          console.log('✅ Video track created successfully');
+        } catch (videoError) {
+          console.error('❌ Failed to create video track:', videoError);
+          this.localVideoTrack = null;
+        }
+      } else {
+        console.log('ℹ️ Skipping video track creation - no camera detected');
+        this.localVideoTrack = null;
+      }
+      
+      if (!audioSuccess && !videoSuccess) {
+        console.log('❌ No tracks created - no devices available or accessible');
+        return false;
+      }
+      
+      console.log(`✅ Local tracks created - Audio: ${audioSuccess ? 'Yes' : 'No'}, Video: ${videoSuccess ? 'Yes' : 'No'}`);
+      return audioSuccess || videoSuccess;
     } catch (error) {
       console.error('❌ Failed to create local tracks:', error);
-      toast.error('Failed to access camera/microphone');
       return false;
     }
   }
@@ -137,12 +208,29 @@ class VideoCallService {
   // Publish local tracks to the channel
   async publishLocalTracks() {
     try {
-      if (this.client && this.localAudioTrack && this.localVideoTrack) {
-        await this.client.publish([this.localAudioTrack, this.localVideoTrack]);
-        console.log('✅ Local tracks published successfully');
-        return true;
+      if (!this.client) {
+        console.error('❌ No client available for publishing');
+        return false;
       }
-      return false;
+      
+      const tracksToPublish = [];
+      
+      if (this.localAudioTrack) {
+        tracksToPublish.push(this.localAudioTrack);
+      }
+      
+      if (this.localVideoTrack) {
+        tracksToPublish.push(this.localVideoTrack);
+      }
+      
+      if (tracksToPublish.length > 0) {
+        await this.client.publish(tracksToPublish);
+        console.log(`✅ Published ${tracksToPublish.length} track(s) successfully`);
+        return true;
+      } else {
+        console.log('⚠️ No tracks available to publish');
+        return false;
+      }
     } catch (error) {
       console.error('❌ Failed to publish local tracks:', error);
       toast.error('Failed to publish video/audio');
@@ -159,8 +247,11 @@ class VideoCallService {
         console.log(this.isMuted ? '🔇 Microphone muted' : '🎤 Microphone unmuted');
         toast.success(this.isMuted ? 'Microphone muted' : 'Microphone unmuted');
         return this.isMuted;
+      } else {
+        toast.error('Microphone not available. Please check permissions.');
+        console.log('⚠️ No audio track available for mute toggle');
+        return false;
       }
-      return false;
     } catch (error) {
       console.error('❌ Failed to toggle mute:', error);
       toast.error('Failed to toggle microphone');
@@ -177,8 +268,11 @@ class VideoCallService {
         console.log(this.isVideoEnabled ? '📹 Video enabled' : '📹 Video disabled');
         toast.success(this.isVideoEnabled ? 'Video enabled' : 'Video disabled');
         return this.isVideoEnabled;
+      } else {
+        toast.error('Camera not available. Please check permissions.');
+        console.log('⚠️ No video track available for video toggle');
+        return false;
       }
-      return false;
     } catch (error) {
       console.error('❌ Failed to toggle video:', error);
       toast.error('Failed to toggle video');

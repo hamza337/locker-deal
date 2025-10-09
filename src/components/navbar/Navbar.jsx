@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaEllipsisV, FaTimes, FaCheckCircle, FaCamera, FaCrop, FaUsers, FaGraduationCap, FaHashtag, FaHandshake } from 'react-icons/fa';
+import { FaEllipsisV, FaTimes, FaCheckCircle, FaCamera, FaCrop, FaUsers, FaGraduationCap, FaHashtag, FaHandshake, FaCrown, FaTrophy } from 'react-icons/fa';
 import { MdSportsVolleyball, MdLocationOn } from 'react-icons/md';
 import { FaInstagram, FaFacebook, FaTwitter, FaLinkedin, FaYoutube, FaTiktok } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { uploadFile } from '../../services/uploadService';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import subscriptionService from '../../services/subscriptionService';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -13,7 +14,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
-  const [profileImage, setProfileImage] = useState('https://randomuser.me/api/portraits/men/32.jpg');
+  const [profileImage, setProfileImage] = useState('/default-avatar.svg');
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [cropData, setCropData] = useState({ x: 0, y: 0, size: 200 });
@@ -25,6 +26,7 @@ const Navbar = () => {
   const [userData, setUserData] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [athleteFormData, setAthleteFormData] = useState({
     firstName: '',
     lastName: '',
@@ -89,20 +91,30 @@ const Navbar = () => {
   // Helper functions to get user profile data with fallbacks
   const getUserName = () => {
     if (userData?.role === 'athlete') {
-      const firstName = userData?.athleteProfile?.firstName;
-      const lastName = userData?.athleteProfile?.lastName;
-      if (firstName && lastName) {
-        return `${firstName} ${lastName}`;
-      } else if (firstName) {
-        return firstName;
+      // Check if athleteProfile exists and has name data
+      if (userData?.athleteProfile) {
+        const firstName = userData.athleteProfile.firstName;
+        const lastName = userData.athleteProfile.lastName;
+        if (firstName && lastName) {
+          return `${firstName} ${lastName}`;
+        } else if (firstName) {
+          return firstName;
+        }
       }
+      // Fallback for null athleteProfile
+      return 'Professional Athlete';
     } else if (userData?.role === 'brand') {
-      const brandName = userData?.brandProfile?.brandName || userData?.brandProfile?.companyName;
-      if (brandName) {
-        return brandName;
+      // Check if brandProfile exists and has name data
+      if (userData?.brandProfile) {
+        const brandName = userData.brandProfile.brandName || userData.brandProfile.companyName;
+        if (brandName) {
+          return brandName;
+        }
       }
+      // Fallback for null brandProfile
+      return 'Brand';
     }
-    return 'Professional User';
+    return 'Athlete';
   };
 
   const getUserEmail = () => {
@@ -111,15 +123,76 @@ const Navbar = () => {
 
   const getUserProfileImage = () => {
     if (userData?.role === 'athlete') {
-      return userData?.athleteProfile?.profilePictureUrl || profileImage;
+      // Check if athleteProfile exists and has profile picture
+      if (userData?.athleteProfile?.profilePictureUrl) {
+        return userData.athleteProfile.profilePictureUrl;
+      }
     } else if (userData?.role === 'brand') {
-      return userData?.brandProfile?.logo || userData?.brandProfile?.profilePictureUrl || profileImage;
+      // Check if brandProfile exists and has logo or profile picture
+      if (userData?.brandProfile?.logo) {
+        return userData.brandProfile.logo;
+      } else if (userData?.brandProfile?.profilePictureUrl) {
+        return userData.brandProfile.profilePictureUrl;
+      }
     }
-    return profileImage;
+    // Return professional default avatar for all cases
+    return '/default-avatar.svg';
   };
 
   const getBrandCategory = () => {
     return userData?.brandProfile?.category || userData?.brandProfile?.industry || 'Professional Services';
+  };
+
+  const getSubscriptionPlan = () => {
+    return userData?.subscriptionPlan || 'PAY_PER_DEAL';
+  };
+
+  const getSubscriptionBadgeColor = (plan) => {
+    switch(plan) {
+      case 'PREMIUM':
+      case 'PREMIUM_MONTHLY':
+        return 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black';
+      case 'PAY_PER_DEAL':
+      default:
+        return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white';
+    }
+  };
+
+  const handleUpgradeSubscription = () => {
+    subscriptionService.showRestrictionPopup('upgrade');
+    setProfileModalOpen(false);
+  };
+
+  const handleCancelSubscription = async () => {
+    if (window.confirm('Are you sure you want to cancel your Premium subscription? You will be switched back to Pay Per Deal.')) {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}payment/cancel-subscription`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          toast.success('Subscription cancelled successfully. You are now on Pay Per Deal.');
+          // Update user data to reflect the change
+          const updatedUserData = { ...userData, subscriptionPlan: 'PAY_PER_DEAL' };
+          localStorage.setItem('userData', JSON.stringify(updatedUserData));
+          window.location.reload(); // Refresh to update UI
+        } else {
+          const errorData = await response.json();
+          toast.error(errorData.message || 'Failed to cancel subscription');
+        }
+      } catch (error) {
+        console.error('Error cancelling subscription:', error);
+        toast.error('An error occurred while cancelling subscription');
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   // Handle athlete form data changes
@@ -318,7 +391,18 @@ const Navbar = () => {
   return (
     <nav className="w-full flex items-center justify-between px-4 sm:px-6 md:px-8 py-3 bg-transparent">
       {/* Left: Logo */}
-      <img src="/appLogo.png" alt="Locker Deal Logo" className="h-10 md:h-12" />
+      <img 
+        src="/appLogo.png" 
+        alt="Locker Deal Logo" 
+        className="h-10 md:h-12 cursor-pointer hover:opacity-80 transition" 
+        onClick={() => {
+          if (userData?.role === 'athlete') {
+            navigate('/dashboard');
+          } else if (userData?.role === 'brand') {
+            navigate('/brand/dashboard');
+          }
+        }}
+      />
       {/* Right: User Info (hidden on mobile) and menu */}
       <div className="flex items-center gap-4 relative">
         {/* Profile info and avatar only on md+ */}
@@ -326,7 +410,7 @@ const Navbar = () => {
           <img
             src={getUserProfileImage()}
             alt="User Avatar"
-            className="h-12 w-12 md:h-16 md:w-16 rounded-full object-cover border-2 border-white"
+            className="h-12 w-12 md:h-12 md:w-12 rounded-full object-cover border-2 border-white"
           />
           <div className="flex flex-col items-start justify-center">
             <span className="text-white font-bold text-base md:text-lg leading-tight">{getUserName()}</span>
@@ -913,6 +997,67 @@ const Navbar = () => {
                           <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
                             <option>Email</option>
                           </select>
+                        </div>
+                      </div>
+                      {/* Subscription */}
+                      <div className="bg-[#232626] rounded-lg p-4 mt-2">
+                        <span className="text-[#9afa00] font-bold text-lg block mb-4">SUBSCRIPTION PLAN</span>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            {getSubscriptionPlan() === 'PREMIUM' || getSubscriptionPlan() === 'PREMIUM_MONTHLY' ? (
+                              <FaCrown className="text-[#9afa00] text-2xl" />
+                            ) : (
+                              <FaTrophy className="text-blue-500 text-2xl" />
+                            )}
+                            <div>
+                              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getSubscriptionBadgeColor(getSubscriptionPlan())}`}>
+                                {getSubscriptionPlan() === 'PREMIUM' || getSubscriptionPlan() === 'PREMIUM_MONTHLY' ? 'PREMIUM' : 'PAY PER DEAL'}
+                              </div>
+                              <p className="text-gray-300 text-xs mt-1">
+                                {getSubscriptionPlan() === 'PREMIUM' || getSubscriptionPlan() === 'PREMIUM_MONTHLY' 
+                                  ? 'Full access with monthly billing' 
+                                  : 'Pay only for completed deals'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                          {(getSubscriptionPlan() === 'PAY_PER_DEAL' || !getSubscriptionPlan()) && (
+                             <button
+                               onClick={handleUpgradeSubscription}
+                               className="bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black font-bold px-4 py-2 rounded-lg text-sm hover:shadow-lg hover:shadow-[#9afa00]/25 transition-all duration-200"
+                             >
+                               Upgrade
+                             </button>
+                           )}
+                           {(getSubscriptionPlan() === 'PREMIUM' || getSubscriptionPlan() === 'PREMIUM_MONTHLY') && (
+                             <button
+                               onClick={handleCancelSubscription}
+                               disabled={isLoading}
+                               className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                             >
+                               {isLoading ? 'Cancelling...' : 'Cancel'}
+                             </button>
+                           )}
+                        </div>
+                        <div className="text-white text-xs">
+                          <p className="mb-2">Current Plan Benefits:</p>
+                          <ul className="list-disc list-inside space-y-1 text-gray-300">
+                            {getSubscriptionPlan() === 'PREMIUM' || getSubscriptionPlan() === 'PREMIUM_MONTHLY' ? (
+                              <>
+                                <li>Unlimited campaigns</li>
+                                <li>Priority support</li>
+                                <li>Advanced analytics</li>
+                                <li>Direct athlete messaging</li>
+                              </>
+                            ) : (
+                              <>
+                                <li>Full access to all features</li>
+                                <li>Pay only for completed deals</li>
+                                <li>Chat with athletes</li>
+                                <li>Create campaigns</li>
+                              </>
+                            )}
+                          </ul>
                         </div>
                       </div>
                     </form>

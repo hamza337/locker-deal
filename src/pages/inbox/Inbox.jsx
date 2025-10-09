@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo, FaSmile } from 'react-icons/fa';
+import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo, FaSmile, FaFileContract, FaDollarSign, FaArrowLeft } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import { getChatList, getChatHistory } from '../../services/chatService';
 import socketService from '../../services/socketService';
@@ -16,32 +16,7 @@ import toast from 'react-hot-toast';
 // Dynamic documents will be fetched from API
 
 const Inbox = () => {
-  // Check if user has access to chat functionality
-  const user = localStorage.getItem('user');
-  if (user) {
-    const userData = JSON.parse(user);
-    if (userData.role === 'brand' && !subscriptionService.checkFeatureAccess('chat')) {
-      // Show subscription popup and prevent access
-      setTimeout(() => {
-        subscriptionService.showRestrictionPopup('chat');
-      }, 100);
-      
-      return (
-        <div className="w-full min-h-screen bg-transparent flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">Chat Access Restricted</h2>
-            <p className="text-gray-400 mb-6">Please upgrade your subscription to access chat functionality.</p>
-            <button
-              onClick={() => subscriptionService.showRestrictionPopup('chat')}
-              className="bg-[#9afa00] text-black font-bold px-6 py-3 rounded-lg hover:bg-[#baff32] transition"
-            >
-              Upgrade Now
-            </button>
-          </div>
-        </div>
-      );
-    }
-  }
+  // All users now have access to chat functionality regardless of subscription plan
 
   // Helper function to extract filename from S3 URL and apply ellipsis
   const extractFilenameFromUrl = (url, maxLength = 30) => {
@@ -126,12 +101,37 @@ const Inbox = () => {
   const [gptEnabled, setGptEnabled] = useState(false);
   const [isAthlete, setIsAthlete] = useState(false);
   
+  // Tab states for athletes
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' or 'ai-assistant'
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiNewMessage, setAiNewMessage] = useState('');
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [aiConnectionStatus, setAiConnectionStatus] = useState('disconnected');
+  const [isAiStreaming, setIsAiStreaming] = useState(false);
+  const [currentStreamingMessage, setCurrentStreamingMessage] = useState(null);
+  
+  // Contract modal states
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [contractData, setContractData] = useState({
+    title: '',
+    amount: '',
+    expiryDate: '',
+    paymentResponsibility: 'brand',
+    contractFile: null
+  });
+  const [isCreatingContract, setIsCreatingContract] = useState(false);
+  const [contractFileUrl, setContractFileUrl] = useState('');
+  
   const canvasRef = useRef(null);
   const documentRef = useRef(null);
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
+  const contractFileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const aiMessagesEndRef = useRef(null);
 
   // Check user type and subscription access on component mount
   useEffect(() => {
@@ -171,6 +171,103 @@ const Inbox = () => {
     
     fetchChatList();
   }, []);
+
+  // Setup AI socket event listeners
+  useEffect(() => {
+    if (!socketService.socket || !isAthlete) return;
+
+    const socket = socketService.socket;
+
+    // AI Connection Events
+    const handleConnect = () => {
+      setAiConnectionStatus('connected');
+      console.log('🤖 Connected to AI server');
+    };
+
+    const handleDisconnect = () => {
+      setAiConnectionStatus('disconnected');
+      console.log('🤖 Disconnected from AI server');
+    };
+
+    // AI Streaming Events
+    const handleStreamStart = () => {
+      console.log('🤖 AI stream started');
+      setIsAiStreaming(true);
+      const newMessage = {
+        id: Date.now(),
+        fromMe: false,
+        text: '',
+        time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+        isSystem: true,
+        isStreaming: true
+      };
+      setCurrentStreamingMessage(newMessage);
+      setAiMessages(prev => [...prev, newMessage]);
+    };
+
+    const handleStreamChunk = (data) => {
+      console.log('🤖 Received chunk data:', data);
+      
+      // Handle both string tokens and object with token property
+      const token = typeof data === 'string' ? data : (data.token || data.chunk || '');
+      
+      if (!token) {
+        console.warn('🤖 Empty token received:', data);
+        return;
+      }
+      
+      console.log('🤖 Processing token:', token);
+      
+      setAiMessages(prev => {
+        const updated = [...prev];
+        const lastMessage = updated[updated.length - 1];
+        if (lastMessage && lastMessage.isStreaming) {
+          // Create a new object to ensure React detects the change
+          const updatedMessage = {
+            ...lastMessage,
+            text: lastMessage.text + token
+          };
+          updated[updated.length - 1] = updatedMessage;
+        }
+        return updated;
+      });
+    };
+
+    const handleStreamEnd = () => {
+      console.log('🤖 AI stream ended');
+      setIsAiStreaming(false);
+      setCurrentStreamingMessage(null);
+      setAiMessages(prev => {
+        const updated = [...prev];
+        const lastMessage = updated[updated.length - 1];
+        if (lastMessage && lastMessage.isStreaming) {
+          lastMessage.isStreaming = false;
+        }
+        return updated;
+      });
+    };
+
+    // Add event listeners
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('gpt_stream_start', handleStreamStart);
+    socket.on('gpt_stream_chunk', handleStreamChunk);
+    socket.on('gpt_stream_end', handleStreamEnd);
+
+    // Set initial connection status
+    if (socket.connected) {
+      setAiConnectionStatus('connected');
+    }
+
+    // Cleanup listeners on unmount
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('gpt_stream_start', handleStreamStart);
+      socket.off('gpt_stream_chunk', handleStreamChunk);
+      socket.off('gpt_stream_end', handleStreamEnd);
+    };
+  }, [isAthlete, socketService.socket]);
 
   // Cleanup socket listeners on unmount
   useEffect(() => {
@@ -264,11 +361,13 @@ const Inbox = () => {
       if (isMessageForCurrentChat) {
         // Add message to current chat if it's from another user (avoid duplicates)
         if (message.sender.id !== user.id) {
+          const messageDate = message.createdAt || message.timestamp || new Date().toISOString();
           const newMessage = {
             id: message.id || Date.now(),
             fromMe: false,
             text: message.content || message.text || message.message,
-            time: message.timestamp ? new Date(message.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            time: new Date(messageDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            createdAt: messageDate,
             type: message.type || 'text',
             mediaUrl: message.mediaUrl || null,
             fileName: message.fileName || null,
@@ -300,14 +399,37 @@ const Inbox = () => {
       console.log('📋 Received chat list update:', updatedChatList);
       
       // Transform API data to match component structure (same as fetchChatList)
-      const transformedChats = updatedChatList.map((chat, index) => ({
-        userId: chat.user.id,
-        avatar: `https://randomuser.me/api/portraits/men/${(index % 8) + 1}.jpg`,
-        name: chat.user.email,
-        message: chat.lastMessage,
-        time: chat.lastMessageTime ? new Date(chat.lastMessageTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '12:25',
-        badge: chat.unreadCount
-      }));
+      const transformedChats = updatedChatList.map((chat, index) => {
+        let displayName = 'Unknown';
+        let profileImage = '/user.png'; // Default fallback
+        
+        if (isAthlete) {
+          // For athletes, show brand profile data
+          if (chat.user.brandProfile) {
+            displayName = `${chat.user.brandProfile.firstName || ''} ${chat.user.brandProfile.lastName || ''}`.trim();
+          }
+          if (chat.user.brandProfile.profilePictureUrl) {
+            profileImage = chat.user.brandProfile.profilePictureUrl;
+          }
+        } else {
+          // For brands, show athlete profile data
+          if (chat.user.athleteProfile) {
+            displayName = `${chat.user.athleteProfile.firstName || ''} ${chat.user.athleteProfile.lastName || ''}`.trim();
+          }
+          if (chat.user.athleteProfile.profilePictureUrl) {
+            profileImage = chat.user.athleteProfile.profilePictureUrl;
+          }
+        }
+        
+        return {
+          userId: chat.user.id,
+          avatar: profileImage,
+          name: displayName,
+          message: chat.lastMessage,
+          time: chat.lastMessageTime ? new Date(chat.lastMessageTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '12:25',
+          badge: chat.unreadCount
+        };
+      });
       
       setChats(transformedChats);
       console.log('✅ Chat list updated automatically');
@@ -343,7 +465,7 @@ const Inbox = () => {
       // So we just need to update the UI state to 'active'
       if (videoCallService.isInCall()) {
         setVideoCallType('active');
-        toast.success('Call connected!');
+        toast.success('Call accepted!');
       } else {
         // Fallback: try to join with token if provided
         if (token && videoCallData.channelName) {
@@ -352,16 +474,16 @@ const Inbox = () => {
             .then(success => {
               if (success) {
                 setVideoCallType('active');
-                toast.success('Call connected!');
+                toast.success('Call accepted!');
               } else {
                 setShowVideoCall(false);
-                toast.error('Failed to connect to call');
+                toast.error('Failed to connect to call 1');
               }
             })
             .catch(error => {
               console.error('❌ Failed to join call after acceptance:', error);
               setShowVideoCall(false);
-              toast.error('Failed to connect to call');
+              toast.error('Failed to connect to call 2');
             });
         } else {
           console.warn('⚠️ No token provided and not already in call');
@@ -429,14 +551,37 @@ const Inbox = () => {
       const chatData = await getChatList();
 
       // Transform API data to match component structure
-      const transformedChats = chatData.map((chat, index) => ({
-        userId: chat.user.id,
-        avatar: `https://randomuser.me/api/portraits/men/${(index % 8) + 1}.jpg`, // Static placeholder
-        name: chat.user.email, // Static placeholder using first 8 chars of userId
-        message: chat.lastMessage,
-        time: '12:25', // Static placeholder
-        badge: chat.unreadCount
-      }));
+      const transformedChats = chatData.map((chat, index) => {
+        let displayName = 'Unknown';
+        let profileImage = '/user.png'; // Default fallback
+        
+        if (isAthlete) {
+          // For athletes, show brand profile data
+          if (chat.user.brandProfile) {
+            displayName = `${chat.user.brandProfile.firstName || ''} ${chat.user.brandProfile.lastName || ''}`.trim();
+          }
+          if (chat.user.brandProfile?.profilePictureUrl) {
+            profileImage = chat.user.brandProfile.profilePictureUrl;
+          }
+        } else {
+          // For brands, show athlete profile data
+          if (chat.user.athleteProfile) {
+            displayName = `${chat.user.athleteProfile.firstName || ''} ${chat.user.athleteProfile.lastName || ''}`.trim();
+          }
+          if (chat.user.athleteProfile?.profilePictureUrl) {
+            profileImage = chat.user.athleteProfile.profilePictureUrl;
+          }
+        }
+        
+        return {
+          userId: chat.user.id,
+          avatar: profileImage,
+          name: displayName,
+          message: chat.lastMessage,
+          time: chat.lastMessageTime ? new Date(chat.lastMessageTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '12:25',
+          badge: chat.unreadCount
+        };
+      });
       
       setChats(transformedChats);
     } catch (error) {
@@ -470,16 +615,20 @@ const Inbox = () => {
       });
       
       // Transform API data to match component structure
-      const transformedMessages = sortedHistory.map((msg, index) => ({
-        id: msg.id || index,
-        fromMe: msg.sender.id === userId,
-        text: msg.content || msg.message,
-        time: msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '12:00',
-        type: msg.type || 'text',
-        mediaUrl: msg.mediaUrl || null,
-        fileName: msg.fileName || null,
-        fileSize: msg.fileSize || null
-      }));
+      const transformedMessages = sortedHistory.map((msg, index) => {
+        const messageDate = msg.createdAt || msg.timestamp;
+        return {
+          id: msg.id || index,
+          fromMe: msg.sender.id === userId,
+          text: msg.content || msg.message,
+          time: messageDate ? new Date(messageDate).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '12:00',
+          createdAt: messageDate,
+          type: msg.type || 'text',
+          mediaUrl: msg.mediaUrl || null,
+          fileName: msg.fileName || null,
+          fileSize: msg.fileSize || null
+        };
+      });
       
       setMessages(transformedMessages);
     } catch (error) {
@@ -529,21 +678,20 @@ const Inbox = () => {
   // Send message function
   const sendMessage = () => {
     if (newMessage.trim() && selectedChat) {
-      // Check subscription access for brand users
-      if (!subscriptionService.validateAccess('chat')) {
-        return;
-      }
+      // All users now have access to chat functionality regardless of subscription plan
       
       // Send message via socket
       const success = socketService.sendMessage(selectedChat.userId, newMessage);
       
       if (success) {
         // Add message to local state immediately for better UX
+        const currentTime = new Date().toISOString();
         const message = {
           id: Date.now(),
           fromMe: true,
           text: newMessage,
-          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+          time: new Date(currentTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+          createdAt: currentTime,
           type: 'text'
         };
         setMessages(prev => [...prev, message]);
@@ -873,6 +1021,125 @@ const Inbox = () => {
     setCreatingMeeting(false);
   };
 
+  // Contract modal functions
+  const openContractModal = () => {
+    if (!selectedChat) {
+      toast.error('Please select a chat first');
+      return;
+    }
+    
+    // Reset contract data
+    setContractData({
+      title: '',
+      amount: '',
+      expiryDate: '',
+      paymentResponsibility: 'brand',
+      contractFile: null
+    });
+    setContractFileUrl('');
+    setShowContractModal(true);
+    setShowDropdown(false);
+  };
+
+  const closeContractModal = () => {
+    setShowContractModal(false);
+    setContractData({
+      title: '',
+      amount: '',
+      expiryDate: '',
+      paymentResponsibility: 'brand',
+      contractFile: null
+    });
+    setContractFileUrl('');
+    setIsCreatingContract(false);
+  };
+
+  const handleContractFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type (PDF only for contracts)
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload only PDF files for contracts');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      toast.loading('Uploading contract file...', { id: 'contract-upload' });
+      
+      // Upload file using existing uploadService
+      const uploadResult = await uploadFile(file);
+      
+      setContractData(prev => ({ ...prev, contractFile: file }));
+      setContractFileUrl(uploadResult.mediaUrl);
+      
+      toast.success('Contract file uploaded successfully!', { id: 'contract-upload' });
+    } catch (error) {
+      console.error('Contract file upload failed:', error);
+      toast.error('Failed to upload contract file', { id: 'contract-upload' });
+    }
+
+    e.target.value = '';
+  };
+
+  const createContract = async () => {
+    if (!contractData.title || !contractData.amount || !contractData.expiryDate || !contractFileUrl) {
+      toast.error('Please fill in all required fields and upload a contract file');
+      return;
+    }
+
+    if (!selectedChat) {
+      toast.error('Please select a chat first');
+      return;
+    }
+
+    setIsCreatingContract(true);
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7000/';
+      const token = localStorage.getItem('access_token');
+
+      const contractPayload = {
+        athleteId: selectedChat.userId,
+        title: contractData.title,
+        amount: parseFloat(contractData.amount),
+        expiryDate: contractData.expiryDate,
+        paymentResponsibility: contractData.paymentResponsibility,
+        contractFileUrl: contractFileUrl
+      };
+
+      console.log('Creating contract with payload:', contractPayload);
+
+      const response = await fetch(`${baseUrl}contracts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(contractPayload)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Contract created successfully!');
+        closeContractModal();
+      } else {
+        throw new Error(data.message || 'Failed to create contract');
+      }
+    } catch (error) {
+      console.error('Error creating contract:', error);
+      toast.error('Failed to create contract: ' + error.message);
+    } finally {
+      setIsCreatingContract(false);
+    }
+  };
+
   // Video call functions
   const startVideoCall = async () => {
     if (!selectedChat) {
@@ -965,16 +1232,16 @@ const Inbox = () => {
           .then(success => {
             if (success) {
               setVideoCallType('active');
-              toast.success('Call accepted!');
+              // Toast message will be shown by handleCallAccepted socket event
             } else {
               setShowVideoCall(false);
-              toast.error('Failed to connect to call');
+              toast.error('Failed to connect to call 4');
             }
           })
           .catch(error => {
             console.error('❌ Failed to join call after accepting:', error);
             setShowVideoCall(false);
-            toast.error('Failed to connect to call');
+            toast.error('Failed to connect to call 5');
           });
       } else {
         console.error('❌ Invalid response from backend - missing token');
@@ -1051,11 +1318,13 @@ const Inbox = () => {
 
       if (success) {
         // Add to local messages for immediate UI update
+        const currentTime = new Date().toISOString();
         const newMessage = {
           id: Date.now(),
           fromMe: true,
           text: meetingMessage,
-          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+          time: new Date(currentTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+          createdAt: currentTime,
           type: 'meeting'
         };
 
@@ -1090,6 +1359,167 @@ const Inbox = () => {
     }
   };
 
+  // Handle back button navigation
+  const handleBackToDashboard = () => {
+    if (isAthlete) {
+      navigate('/dashboard');
+    } else {
+      navigate('/brand/dashboard');
+    }
+  };
+
+  // Handle back to chats from AI assistant
+  const handleBackToChats = () => {
+    setActiveTab('chats');
+  };
+
+  // AI Assistant functions
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload only PDF files');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setIsUploadingPdf(true);
+    
+    // Add system message about upload start
+    const uploadMessage = {
+      id: Date.now(),
+      fromMe: false,
+      text: `📄 Uploaded: ${file.name}\nAnalyzing contract...`,
+      time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      isSystem: true
+    };
+    setAiMessages(prev => [...prev, uploadMessage]);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7000';
+      const response = await fetch(`${baseUrl}gpt/analyze`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.summary) {
+        // Add document to uploaded list
+        const newDocument = {
+          id: Date.now(),
+          name: file.name,
+          size: file.size,
+          uploadedAt: new Date().toLocaleTimeString()
+        };
+        setUploadedDocuments(prev => [...prev, newDocument]);
+        
+        // Add AI analysis response
+        const analysisMessage = {
+          id: Date.now() + 1,
+          fromMe: false,
+          text: `📊 Contract Analysis:\n${data.summary}`,
+          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+          isSystem: true
+        };
+        setAiMessages(prev => [...prev, analysisMessage]);
+        
+        toast.success('PDF analyzed successfully!');
+      } else {
+        throw new Error(data.message || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('PDF upload/analysis failed:', error);
+      const errorMessage = {
+        id: Date.now() + 2,
+        fromMe: false,
+        text: `❌ Error analyzing PDF: ${error.message}`,
+        time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+        isSystem: true
+      };
+      setAiMessages(prev => [...prev, errorMessage]);
+      toast.error('Failed to analyze PDF');
+    } finally {
+      setIsUploadingPdf(false);
+    }
+
+    e.target.value = '';
+  };
+
+  const sendAiMessage = () => {
+    console.log('🤖 sendAiMessage called');
+    
+    if (!aiNewMessage.trim() || !socketService.socket) {
+      console.log('🤖 Message empty or socket not available');
+      return;
+    }
+
+    if (aiConnectionStatus !== 'connected') {
+      console.log('🤖 AI not connected, status:', aiConnectionStatus);
+      toast.error('AI Assistant is not connected. Please try again.');
+      return;
+    }
+
+    if (isAiStreaming) {
+      console.log('🤖 AI is already streaming, ignoring request');
+      return;
+    }
+
+    const userMessage = {
+      id: Date.now(),
+      fromMe: true,
+      text: aiNewMessage,
+      time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+    };
+
+    console.log('🤖 Adding user message to chat:', userMessage);
+    setAiMessages(prev => [...prev, userMessage]);
+    
+    const messageToSend = aiNewMessage;
+    setAiNewMessage('');
+
+    // Send message to AI via socket
+    try {
+      console.log('🤖 Emitting gpt_stream event with prompt:', messageToSend);
+      console.log('🤖 Socket connected:', socketService.socket.connected);
+      socketService.socket.emit('gpt_stream', { prompt: messageToSend });
+      console.log('🤖 Message sent successfully');
+    } catch (error) {
+      console.error('🤖 Error sending AI message:', error);
+      toast.error('Failed to send message to AI Assistant');
+    }
+  };
+
+  const handleAiKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendAiMessage();
+    }
+  };
+
+  const removeDocument = (docId) => {
+    setUploadedDocuments(prev => prev.filter(doc => doc.id !== docId));
+    toast.success('Document removed');
+  };
+
+  // Auto-scroll for AI messages
+  useEffect(() => {
+    if (aiMessagesEndRef.current) {
+      aiMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [aiMessages]);
+
   // Handle emoji selection
   const handleEmojiSelect = (emojiObject) => {
     setNewMessage(prev => prev + emojiObject.emoji);
@@ -1113,39 +1543,80 @@ const Inbox = () => {
     };
   }, [showEmojiPicker]);
 
-  // Handle GPT toggle
-  const handleGptToggle = () => {
-    const newGptState = !gptEnabled;
-    setGptEnabled(newGptState);
-    
-    // Emit socket event to toggle GPT
-    if (socketService.socket?.connected) {
-      socketService.socket.emit('toggle_gpt', { enabled: newGptState }, (resp) => {
-        console.log('GPT toggled:', resp);
-        if (resp && resp.gptEnabled) {
-          toast.success(`GPT auto-replies ${newGptState ? 'enabled' : 'disabled'}`);
-        } else {
-          // Revert state if failed
-          setGptEnabled(!newGptState);
-          toast.error('Failed to toggle GPT. Please try again.');
-        }
-      });
-    } else {
-      toast.error('Not connected to chat server');
-      setGptEnabled(!newGptState); // Revert state
-    }
-  };
+  // Handle GPT toggle - COMMENTED OUT FOR ATHLETES
+  // const handleGptToggle = () => {
+  //   const newGptState = !gptEnabled;
+  //   setGptEnabled(newGptState);
+  //   
+  //   // Emit socket event to toggle GPT
+  //   if (socketService.socket?.connected) {
+  //     socketService.socket.emit('toggle_gpt', { enabled: newGptState }, (resp) => {
+  //       console.log('GPT toggled:', resp);
+  //       if (resp && resp.gptEnabled) {
+  //         toast.success(`GPT auto-replies ${newGptState ? 'enabled' : 'disabled'}`);
+  //       } else {
+  //         // Revert state if failed
+  //         setGptEnabled(!newGptState);
+  //         toast.error('Failed to toggle GPT. Please try again.');
+  //       }
+  //     });
+  //   } else {
+  //     toast.error('Not connected to chat server');
+  //     setGptEnabled(!newGptState); // Revert state
+  //   }
+  // };
 
   return (
-    <div className="w-full h-full flex bg-transparent px-0 md:px-6 py-6 overflow-hidden">
-      <div className="w-full max-w-6xl h-[80vh] bg-[rgba(0,0,0,0.3)] rounded-2xl flex flex-col md:flex-row overflow-hidden shadow-lg min-w-0 mx-auto gap-0">
-        {/* Sidebar (mobile overlay, md+ side) */}
-        <div
-          className={`fixed inset-0 z-40 bg-black bg-opacity-70 transition-opacity md:static md:bg-transparent md:z-0 ${sidebarOpen ? 'flex' : 'hidden'} md:flex`}
-        >
+    <>
+    {/* Global Tabs for Athletes */}
+    <div className='max-w-sm mx-auto'>
+      {isAthlete && (
+        <div className="bg-gradient-to-r from-[#232626] to-[#1a1f1a] px-4 md:px-6 py-3 border-b border-[#9afa00]/20 rounded-2xl">
+          <div className="flex gap-1 bg-[#1a1f1a] p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('chats')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                activeTab === 'chats'
+                  ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black'
+                  : 'text-gray-400 hover:text-white hover:bg-[#2a3622]'
+              }`}
+            >
+              My Chats
+            </button>
+            <button
+              onClick={() => setActiveTab('ai-assistant')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                activeTab === 'ai-assistant'
+                  ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black'
+                  : 'text-gray-400 hover:text-white hover:bg-[#2a3622]'
+              }`}
+            >
+              <FaRobot className="text-sm" />
+              AI Assistant
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+    <div className="w-full h-full flex flex-col gap-8 bg-transparent px-0 md:px-6 py-6 overflow-hidden">
+      <div className={`w-full max-w-7xl h-[80vh] bg-[rgba(0,0,0,0.3)] rounded-2xl ${isAthlete && activeTab === 'ai-assistant' ? 'flex flex-col' : 'flex flex-col md:flex-row'} overflow-hidden shadow-lg min-w-0 mx-auto gap-0`}>
+        {/* Sidebar (mobile overlay, md+ side) - Hidden when AI Assistant is active */}
+        {(!isAthlete || activeTab !== 'ai-assistant') && (
+          <div
+            className={`fixed inset-0 z-40 bg-black bg-opacity-70 transition-opacity md:static md:bg-transparent md:z-0 ${sidebarOpen ? 'flex' : 'hidden'} md:flex`}
+          >
           <div className="w-4/5 max-w-xs xl:max-w-sm min-w-[280px] bg-gradient-to-b from-[#1a2f14] to-[#0f1a0c] flex flex-col p-4 md:p-6 gap-4 h-full rounded-l-2xl md:rounded-l-2xl md:rounded-r-none rounded-r-2xl shadow-2xl">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[#9afa00] text-lg md:text-xl font-bold">MY CHATS</h2>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleBackToDashboard}
+                  className="text-white hover:text-[#9afa00] transition-all duration-200 p-2 rounded-full hover:bg-[#9afa00]/10 group flex items-center gap-2"
+                  title="Back to Dashboard"
+                >
+                  <FaArrowLeft className="text-lg group-hover:scale-110 transition-transform" />
+                </button>
+                <h2 className="text-[#9afa00] text-lg md:text-xl font-bold">MY CHATS</h2>
+              </div>
               <button className="md:hidden text-white text-2xl" onClick={() => setSidebarOpen(false)}><FaTimes /></button>
             </div>
             <div className="relative mb-4">
@@ -1178,8 +1649,8 @@ const Inbox = () => {
                     }`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="relative flex-shrink-0">
-                        <img src={chat.avatar} alt={chat.name} className="w-10 h-10 md:w-11 md:h-11 rounded-full object-cover border-2 border-[#9afa00]/20 group-hover:border-[#9afa00]/50 transition-all" />
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-[#9afa00] rounded-full border-2 border-[#1a2f14]"></div>
+                        <img src={chat.avatar} alt={chat.name} className="p-1 w-10 h-10 md:w-11 md:h-11 rounded-full object-cover border-2 border-[#9afa00]/20 group-hover:border-[#9afa00]/50 transition-all" />
+                        {/* <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-[#9afa00] rounded-full border-2 border-[#1a2f14]"></div> */}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-white font-semibold text-sm leading-tight truncate">{chat.name}</div>
@@ -1200,63 +1671,227 @@ const Inbox = () => {
           {/* Overlay click to close */}
           <div className="flex-1 md:hidden" onClick={() => setSidebarOpen(false)} />
         </div>
+        )}
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-transparent min-w-0 h-full overflow-hidden">
+        <div className={`flex-1 flex flex-col bg-transparent min-w-0 h-full overflow-hidden ${isAthlete && activeTab === 'ai-assistant' ? 'w-full' : ''}`}>          
           {/* Chat Header */}
-          <div className="flex items-center justify-between bg-gradient-to-r from-[#232626] to-[#1a1f1a] px-4 md:px-6 py-4 md:py-5 sticky top-0 z-10 border-b border-[#9afa00]/20 shadow-lg rounded-tr-2xl">
-            <div className="flex items-center gap-4 min-w-0">
-              {/* Sidebar open button on mobile */}
-              <button className="md:hidden text-white text-2xl hover:text-[#9afa00] transition-colors" onClick={() => setSidebarOpen(true)}><FaBars /></button>
-              {selectedChat ? (
-                <>
-                  <div className="relative">
-                    <img src={selectedChat.avatar} alt={selectedChat.name} className="w-11 h-11 md:w-12 md:h-12 rounded-full object-cover border-2 border-[#9afa00]/30" />
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#9afa00] rounded-full border-2 border-[#232626] animate-pulse"></div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-white font-bold text-base md:text-lg truncate">{selectedChat.name}</div>
-                    <div className="text-[#9afa00] text-xs md:text-sm font-medium">Online now</div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-gray-400 text-sm">Select a chat to start messaging</div>
-              )}
+          {(!isAthlete || activeTab === 'chats') && (
+            <div className="bg-gradient-to-r from-[#232626] to-[#1a1f1a] px-4 md:px-6 py-4 md:py-5 sticky top-0 z-10 border-b border-[#9afa00]/20 shadow-lg ${isAthlete ? '' : 'rounded-tr-2xl'}">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 min-w-0">
+                  <button className="md:hidden text-white text-2xl hover:text-[#9afa00] transition-colors" onClick={() => setSidebarOpen(true)}><FaBars /></button>
+                  {selectedChat ? (
+                    <>
+                      <div className="relative">
+                        <img src={selectedChat.avatar} alt={selectedChat.name} className=" p-1 w-11 h-11 md:w-12 md:h-12 rounded-full object-cover border-2 border-[#9afa00]/30" />
+                        {/* <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#9afa00] rounded-full border-2 border-[#232626] animate-pulse"></div> */}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-white font-bold text-base md:text-lg truncate">{selectedChat.name}</div>
+                        {/* <div className="text-[#9afa00] text-xs md:text-sm font-medium">Online now</div> */}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-gray-400 text-sm">Select a chat to start messaging</div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* GPT Toggle Button (only for athletes) - COMMENTED OUT */}
+                  {/* {isAthlete && (
+                    <button 
+                      onClick={handleGptToggle}
+                      className={`p-3 rounded-full transition-all duration-200 border ${
+                        gptEnabled 
+                          ? 'bg-gradient-to-r from-[#9afa00]/20 to-[#7dd800]/20 border-[#9afa00] text-[#9afa00]' 
+                          : 'bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] border-[#9afa00]/20 text-gray-400 hover:text-[#9afa00]'
+                      }`}
+                      title={`GPT Auto-replies ${gptEnabled ? 'Enabled' : 'Disabled'}`}
+                    >
+                      <FaRobot className="text-lg" />
+                    </button>
+                  )} */}
+                  {selectedChat && (
+                    <button 
+                      onClick={startVideoCall}
+                      className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20"
+                      title="Start Video Call"
+                    >
+                      <FaVideo className="text-[#9afa00] text-lg" />
+                    </button>
+                  )}
+                  {/* Removed search and three dots menu for cleaner chat interface */}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              {/* GPT Toggle Button (only for athletes) */}
-              {isAthlete && (
-                <button 
-                  onClick={handleGptToggle}
-                  className={`p-3 rounded-full transition-all duration-200 border ${
-                    gptEnabled 
-                      ? 'bg-gradient-to-r from-[#9afa00]/20 to-[#7dd800]/20 border-[#9afa00] text-[#9afa00]' 
-                      : 'bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] border-[#9afa00]/20 text-gray-400 hover:text-[#9afa00]'
-                  }`}
-                  title={`GPT Auto-replies ${gptEnabled ? 'Enabled' : 'Disabled'}`}
-                >
-                  <FaRobot className="text-lg" />
-                </button>
-              )}
-              {selectedChat && (
-                <button 
-                  onClick={startVideoCall}
-                  className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20"
-                  title="Start Video Call"
-                >
-                  <FaVideo className="text-[#9afa00] text-lg" />
-                </button>
-              )}
-              <button className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20">
-                <FaSearch className="text-[#9afa00] text-lg" />
-              </button>
-              <button className="bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] p-3 rounded-full hover:from-[#9afa00]/20 hover:to-[#9afa00]/10 transition-all duration-200 border border-[#9afa00]/20">
-                <FaEllipsisV className="text-white text-lg" />
-              </button>
-            </div>
-          </div>
+          )}
           {/* Chat Body */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 flex flex-col gap-1 bg-gradient-to-b from-transparent to-[#0a0f08]/30 min-w-0 h-0">
-              {!selectedChat ? (
+          {isAthlete && activeTab === 'ai-assistant' ? (
+             <div className="flex-1 flex flex-col bg-gradient-to-b from-transparent to-[#0a0f08]/30 min-w-0 h-0">
+              {/* AI Assistant Header */}
+              <div className="bg-gradient-to-r from-[#232626] to-[#1a1f1a] px-4 md:px-6 py-4 border-b border-[#9afa00]/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={handleBackToChats}
+                      className="text-white hover:text-[#9afa00] transition-all duration-200 p-2 rounded-full hover:bg-[#9afa00]/10 group flex items-center gap-2"
+                      title="Back to Chats"
+                    >
+                      <FaArrowLeft className="text-lg group-hover:scale-110 transition-transform" />
+                      <span className="hidden sm:inline text-sm font-medium">Chats</span>
+                    </button>
+                    <button className="md:hidden text-white text-2xl hover:text-[#9afa00] transition-colors" onClick={() => setSidebarOpen(true)}><FaBars /></button>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-[#9afa00] to-[#7dd800] rounded-full flex items-center justify-center">
+                        <FaRobot className="text-black text-lg" />
+                      </div>
+                      <div>
+                        <div className="text-white font-bold text-lg">AI Assistant</div>
+                        <div className={`text-sm flex items-center gap-2 ${
+                          aiConnectionStatus === 'connected' ? 'text-[#9afa00]' : 'text-yellow-400'
+                        }`}>
+                          <div className={`w-2 h-2 rounded-full ${
+                            aiConnectionStatus === 'connected' ? 'bg-[#9afa00]' : 'bg-yellow-400'
+                          } ${isAiStreaming ? 'animate-pulse' : ''}`} />
+                          {isAiStreaming ? 'Thinking...' : 
+                           aiConnectionStatus === 'connected' ? 'Ready to help' : 'Connecting...'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Removed search and three dots menu for cleaner AI assistant interface */}
+                </div>
+              </div>
+              
+              {/* Uploaded Documents */}
+              {uploadedDocuments.length > 0 && (
+                <div className="px-4 md:px-6 py-3 border-b border-[#9afa00]/20">
+                  <div className="text-white text-sm font-medium mb-2">Uploaded Documents:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-2 bg-[#232626] px-3 py-2 rounded-lg border border-[#9afa00]/20">
+                        <FaFilePdf className="text-[#9afa00] text-sm" />
+                        <span className="text-white text-xs truncate max-w-[120px]">{doc.name}</span>
+                        <button 
+                          onClick={() => removeDocument(doc.id)}
+                          className="text-gray-400 hover:text-red-400 text-xs ml-1"
+                        >
+                          <FaTimes />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* AI Messages */}
+              <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 flex flex-col gap-3">
+                {aiMessages.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center text-gray-400">
+                      <div className="text-4xl mb-4">🤖</div>
+                      <div className="text-lg mb-2">AI Assistant</div>
+                      <div className="text-sm">Upload a PDF document and start chatting!</div>
+                      <div className="text-xs mt-1 opacity-70">I can help you analyze and understand your documents</div>
+                    </div>
+                  </div>
+                ) : (
+                  aiMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} mb-1`}
+                    >
+                      <div
+                        className={`rounded-2xl px-3 md:px-4 py-2 md:py-3 max-w-[70%] md:max-w-[60%] text-sm md:text-base shadow-lg ${
+                          msg.fromMe 
+                            ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black font-medium' 
+                            : msg.isSystem
+                            ? 'bg-gradient-to-r from-[#2a3622] to-[#1f2b1a] text-white border border-[#9afa00]/30'
+                            : 'bg-gradient-to-r from-[#232626] to-[#1a1f1a] text-white border border-[#9afa00]/20'
+                        } transition-all hover:shadow-xl break-words`}
+                      >
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1 leading-relaxed">
+                            <div className="whitespace-pre-wrap">
+                              {msg.text.split('\n').map((line, index) => (
+                                <div key={index} className={index > 0 ? 'mt-2' : ''}>
+                                  {line.split(/\*\*(.*?)\*\*/).map((part, partIndex) => 
+                                    partIndex % 2 === 1 ? (
+                                      <strong key={partIndex} className="font-bold">{part}</strong>
+                                    ) : (
+                                      part
+                                    )
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {msg.isStreaming && (
+                              <div className="inline-flex items-center ml-2 gap-1">
+                                <div className="flex space-x-1">
+                                  <div className="w-2 h-2 bg-[#9afa00] rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                  <div className="w-2 h-2 bg-[#9afa00] rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                  <div className="w-2 h-2 bg-[#9afa00] rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <span className={`text-xs font-medium ${msg.fromMe ? 'text-black/70' : 'text-gray-400'} whitespace-nowrap flex-shrink-0`}>{msg.time}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={aiMessagesEndRef} />
+              </div>
+              
+              {/* AI Input Area */}
+              <div className="px-4 md:px-6 py-4 border-t border-[#9afa00]/20 bg-gradient-to-r from-[#232626]/50 to-[#1a1f1a]/50">
+                <div className="flex items-end gap-3">
+                  <div className="flex-1 relative">
+                    <textarea
+                      value={aiNewMessage}
+                      onChange={(e) => setAiNewMessage(e.target.value)}
+                      onKeyPress={handleAiKeyPress}
+                      placeholder="Ask me anything about your documents..."
+                      className="w-full bg-[#2a3622] text-white rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 placeholder-gray-400 text-sm border border-[#9afa00]/20 resize-none min-h-[44px] max-h-32"
+                      rows={1}
+                    />
+                    <input
+                      type="file"
+                      ref={pdfInputRef}
+                      onChange={handlePdfUpload}
+                      accept=".pdf"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => pdfInputRef.current?.click()}
+                      disabled={isUploadingPdf}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-[#9afa00] hover:text-[#7dd800] transition-colors disabled:opacity-50"
+                      title="Upload PDF"
+                    >
+                      {isUploadingPdf ? (
+                        <div className="animate-spin w-4 h-4 border-2 border-[#9afa00] border-t-transparent rounded-full" />
+                      ) : (
+                        <FaFilePdf className="text-lg" />
+                      )}
+                    </button>
+                  </div>
+                  <button
+                    onClick={sendAiMessage}
+                    disabled={!aiNewMessage.trim() || isAiStreaming || aiConnectionStatus !== 'connected'}
+                    className="bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black p-3 rounded-full hover:from-[#7dd800] hover:to-[#6bc700] transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAiStreaming ? (
+                      <div className="animate-spin w-5 h-5 border-2 border-black border-t-transparent rounded-full" />
+                    ) : (
+                      <FaPaperPlane className="text-lg" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 flex flex-col gap-1 bg-gradient-to-b from-transparent to-[#0a0f08]/30 min-w-0 h-0">
+              {(!isAthlete && !selectedChat) || (isAthlete && activeTab === 'chats' && !selectedChat) ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center text-gray-400">
                     <div className="text-lg mb-2">💬</div>
@@ -1268,11 +1903,7 @@ const Inbox = () => {
                   <div className="text-gray-400 text-sm">Loading messages...</div>
                 </div>
               ) : (
-                <>
-                  <div className="text-center mb-4">
-                    <span className="bg-[#232626] text-gray-300 text-xs px-4 py-2 rounded-full border border-[#9afa00]/20">24 April</span>
-                  </div>
-                  {messages.length === 0 ? (
+                <>                  {messages.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center">
                       <div className="text-center text-gray-400">
                         <div className="text-lg mb-2">📝</div>
@@ -1281,18 +1912,53 @@ const Inbox = () => {
                       </div>
                     </div>
                   ) : (
-                    messages.map((msg) => (
-                 <div
-                   key={msg.id}
-                   className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} mb-1`}
-                 >
-                   <div
-                     className={`rounded-2xl px-3 md:px-4 py-2 md:py-3 max-w-[70%] md:max-w-[60%] text-sm md:text-base shadow-lg ${
-                       msg.fromMe 
-                         ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black font-medium' 
-                         : 'bg-gradient-to-r from-[#232626] to-[#1a1f1a] text-white border border-[#9afa00]/20'
-                     } transition-all hover:shadow-xl break-words`}
-                   >
+                    (() => {
+                      // Group messages by date
+                      const groupedMessages = [];
+                      let currentDate = null;
+                      
+                      messages.forEach((msg, index) => {
+                        const msgDate = msg.createdAt ? new Date(msg.createdAt).toDateString() : new Date().toDateString();
+                        
+                        if (msgDate !== currentDate) {
+                          currentDate = msgDate;
+                          const dateObj = new Date(msgDate);
+                          const today = new Date().toDateString();
+                          const yesterday = new Date(Date.now() - 86400000).toDateString();
+                          
+                          let displayDate;
+                          if (msgDate === today) {
+                            displayDate = 'Today';
+                          } else if (msgDate === yesterday) {
+                            displayDate = 'Yesterday';
+                          } else {
+                            displayDate = dateObj.toLocaleDateString('en-US', { 
+                              day: 'numeric', 
+                              month: 'long' 
+                            });
+                          }
+                          
+                          groupedMessages.push(
+                            <div key={`date-${msgDate}`} className="text-center mb-4">
+                              <span className="bg-[#232626] text-gray-300 text-xs px-4 py-2 rounded-full border border-[#9afa00]/20">
+                                {displayDate}
+                              </span>
+                            </div>
+                          );
+                        }
+                        
+                        groupedMessages.push(
+                           <div
+                             key={msg.id}
+                             className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} mb-1`}
+                           >
+                             <div
+                               className={`rounded-2xl px-3 md:px-4 py-2 md:py-3 max-w-[70%] md:max-w-[60%] text-sm md:text-base shadow-lg ${
+                                 msg.fromMe 
+                                   ? 'bg-gradient-to-r from-[#9afa00] to-[#7dd800] text-black font-medium' 
+                                   : 'bg-gradient-to-r from-[#232626] to-[#1a1f1a] text-white border border-[#9afa00]/20'
+                               } transition-all hover:shadow-xl break-words`}
+                             >
                      {msg.type === 'text' && (
                        <div className="flex items-end gap-2">
                          <span className="flex-1 leading-relaxed">{msg.text}</span>
@@ -1377,16 +2043,21 @@ const Inbox = () => {
                          </div>
                        </div>
                      )}
-                   </div>
-                 </div>
-                     ))
+                           </div>
+                         </div>
+                         );
+                       });
+                       
+                       return groupedMessages;
+                     })()
                    )}
                  </>
                )}
                <div ref={messagesEndRef} />
              </div>
+           )}
           {/* Chat Input */}
-          {selectedChat && (
+          {selectedChat && (!isAthlete || activeTab === 'chats') && (
            <div className="px-4 md:px-6 py-4 md:py-5 bg-gradient-to-r from-[#232626] to-[#1a1f1a] border-t border-[#9afa00]/20 flex items-center gap-3 relative flex-shrink-0 rounded-br-2xl">
             <div className="relative" ref={dropdownRef}>
                <button 
@@ -1420,6 +2091,13 @@ const Inbox = () => {
                   >
                     <FaCalendarAlt className="text-[#9afa00]" />
                     <span>Schedule a meeting</span>
+                  </button>
+                  <button 
+                    onClick={openContractModal}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#9afa00]/10 transition-all text-left"
+                  >
+                    <FaFileContract className="text-[#9afa00]" />
+                    <span>Create a contract</span>
                   </button>
                   <button 
                     onClick={() => {setShowDropdown(false); fileInputRef.current?.click();}}
@@ -2012,6 +2690,146 @@ const Inbox = () => {
           </div>
         </div>
       )}
+
+      {/* Contract Modal */}
+      {showContractModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] rounded-2xl w-full max-w-md border border-[#9afa00]/20">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <FaFileContract className="text-[#9afa00]" />
+                  Create Contract
+                </h2>
+                <button
+                  onClick={closeContractModal}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <FaTimes size={20} />
+                </button>
+              </div>
+
+              {/* Contract Form */}
+              <div className="space-y-4">
+                {/* Contract Title */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Contract Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={contractData.title}
+                    onChange={(e) => setContractData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Enter contract title"
+                    className="w-full bg-[#2a2a2a] border border-[#9afa00]/30 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 focus:border-[#9afa00]"
+                  />
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <FaDollarSign className="text-[#9afa00]" />
+                    Amount *
+                  </label>
+                  <input
+                    type="number"
+                    value={contractData.amount}
+                    onChange={(e) => setContractData(prev => ({ ...prev, amount: e.target.value }))}
+                    placeholder="Enter contract amount"
+                    min="0"
+                    step="0.01"
+                    className="w-full bg-[#2a2a2a] border border-[#9afa00]/30 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 focus:border-[#9afa00]"
+                  />
+                </div>
+
+                {/* Expiry Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <FaClock className="text-[#9afa00]" />
+                    Expiry Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={contractData.expiryDate}
+                    onChange={(e) => setContractData(prev => ({ ...prev, expiryDate: e.target.value }))}
+                    className="w-full bg-[#2a2a2a] border border-[#9afa00]/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 focus:border-[#9afa00]"
+                  />
+                </div>
+
+                {/* Payment Responsibility */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Payment Responsibility
+                  </label>
+                  <select
+                    value={contractData.paymentResponsibility}
+                    onChange={(e) => setContractData(prev => ({ ...prev, paymentResponsibility: e.target.value }))}
+                    className="w-full bg-[#2a2a2a] border border-[#9afa00]/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 focus:border-[#9afa00]"
+                  >
+                    <option value="brand">Brand</option>
+                    <option value="athlete">Athlete</option>
+                  </select>
+                </div>
+
+                {/* Contract File Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Contract File (PDF) *
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => contractFileInputRef.current?.click()}
+                      className="flex-1 bg-[#2a2a2a] border border-[#9afa00]/30 rounded-lg px-4 py-3 text-gray-400 hover:text-white hover:border-[#9afa00] transition-all flex items-center gap-2"
+                    >
+                      <FaFilePdf className="text-red-400" />
+                      {contractData.contractFile ? contractData.contractFile.name : 'Choose PDF file'}
+                    </button>
+                    {contractFileUrl && (
+                      <div className="text-[#9afa00] text-sm">✓ Uploaded</div>
+                    )}
+                  </div>
+                  <input
+                    ref={contractFileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleContractFileUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={closeContractModal}
+                  disabled={isCreatingContract}
+                  className="flex-1 bg-transparent text-gray-400 font-semibold py-3 px-6 rounded-xl border border-gray-600 hover:bg-gray-800 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createContract}
+                  disabled={isCreatingContract || !contractData.title || !contractData.amount || !contractData.expiryDate || !contractFileUrl}
+                  className="flex-1 bg-[#9afa00] text-black font-semibold py-3 px-6 rounded-xl hover:bg-[#8ae000] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isCreatingContract ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <FaFileContract />
+                      Create Contract
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Video Call Modal */}
       <VideoCall
@@ -2025,6 +2843,7 @@ const Inbox = () => {
         onReject={handleVideoCallReject}
       />
     </div>
+    </>
   );
 };
 

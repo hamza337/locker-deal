@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AthleteDashboardHome from '../../components/athlete/AthleteDashboardHome';
 import AthleteCampaigns from '../../components/athlete/AthleteCampaigns';
+import AthleteContracts from '../../components/athlete/AthleteContracts';
 import { FaBell } from 'react-icons/fa';
 
 
 const TABS = [
   { label: 'Dashboard', key: 'dashboard' },
   { label: 'Campaigns', key: 'campaigns' },
+  { label: 'Contracts', key: 'contracts' },
   { label: 'Chats', key: 'chats' },
 ];
 
@@ -44,6 +46,7 @@ const Dashboard = () => {
       <div className="w-full">
         {activeTab === 'dashboard' && <AthleteDashboardHome />}
         {activeTab === 'campaigns' && <AthleteCampaigns />}
+        {activeTab === 'contracts' && <AthleteContracts />}
       </div>
     </div>
   );

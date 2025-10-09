@@ -38,6 +38,28 @@ const Otp = () => {
     }
   };
   
+  // Handler for paste functionality
+  const handlePaste = (e, idx) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const digits = pastedData.replace(/\D/g, '').slice(0, 6); // Extract only digits, max 6
+    
+    if (digits.length > 0) {
+      const newOtp = [...otp];
+      
+      // Fill the OTP array starting from the current index
+      for (let i = 0; i < digits.length && (idx + i) < 6; i++) {
+        newOtp[idx + i] = digits[i];
+      }
+      
+      setOtp(newOtp);
+      
+      // Focus on the next empty field or the last field
+      const nextFocusIndex = Math.min(idx + digits.length, 5);
+      inputs[nextFocusIndex].current.focus();
+    }
+  };
+  
   // Handle OTP verification
   const handleVerifyOtp = async () => {
     if (!email) {
@@ -138,6 +160,7 @@ const Otp = () => {
             value={otp[idx]}
             className="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl text-center bg-transparent border border-gray-400 rounded-md text-white focus:outline-none focus:border-[#9afa00] transition-all"
             onChange={e => handleChange(e, idx)}
+            onPaste={e => handlePaste(e, idx)}
             inputMode="numeric"
             pattern="[0-9]*"
           />

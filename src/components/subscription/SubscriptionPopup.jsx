@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaTrophy, FaBriefcase, FaCrown } from 'react-icons/fa';
+import { FaTimes, FaTrophy, FaCrown } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import subscriptionService from '../../services/subscriptionService';
 
@@ -11,17 +11,18 @@ const SubscriptionPopup = () => {
 
   const plans = [
     {
-      key: 'freemium',
-      label: 'FREEMIUM',
-      price: 'Free',
-      icon: <FaTrophy className="text-gray-400 text-4xl" />,
+      key: 'pay_per_deal',
+      label: 'PAY PER DEAL',
+      price: 'Per Deal',
+      icon: <FaTrophy className="text-[#9afa00] text-4xl" />,
       features: [
-        'Limited access',
-        'Basic support',
-        'View athlete profiles only'
+        'Full access to all features',
+        'Pay only for completed deals',
+        'Chat with athletes',
+        'Create campaigns'
       ],
       details: 'Current Plan',
-      moreDetails: ['Limited access', 'Basic support', 'View athlete profiles only'],
+      moreDetails: ['Full access to all features', 'Pay only for completed deals', 'Chat with athletes', 'Create campaigns'],
       disabled: true
     },
     {
@@ -30,28 +31,14 @@ const SubscriptionPopup = () => {
       price: '$25/month',
       icon: <FaCrown className="text-[#9afa00] text-4xl" />,
       features: [
-        'Full chat access',
-        'Create campaigns',
-        'Direct athlete messaging',
+        'Everything in Pay Per Deal',
+        'Monthly billing instead of per deal',
         'Priority support',
-        'Advanced analytics'
+        'Advanced analytics',
+        'Enhanced features'
       ],
-      details: 'Most Popular',
-      moreDetails: ['Full chat access', 'Create campaigns', 'Direct athlete messaging', 'Priority support', 'Advanced analytics']
-    },
-    {
-      key: 'pay_per_deal',
-      label: 'PAY PER DEAL',
-      price: 'Per Contract',
-      icon: <FaBriefcase className="text-[#9afa00] text-4xl" />,
-      features: [
-        'Pay only for completed deals',
-        'No monthly commitment',
-        'Full platform access',
-        'Transaction-based pricing'
-      ],
-      details: 'Flexible Option',
-      moreDetails: ['Pay only for completed deals', 'No monthly commitment', 'Full platform access', 'Transaction-based pricing']
+      details: 'Upgrade Option',
+      moreDetails: ['Everything in Pay Per Deal', 'Monthly billing instead of per deal', 'Priority support', 'Advanced analytics', 'Enhanced features']
     }
   ];
 
@@ -75,8 +62,8 @@ const SubscriptionPopup = () => {
   }, []);
 
   const handleSubscribe = async () => {
-    if (selectedPlan === 'freemium') {
-      toast.error('You are already on the Freemium plan');
+    if (selectedPlan === 'pay_per_deal') {
+      toast.error('You are already on the Pay Per Deal plan');
       return;
     }
 
@@ -180,12 +167,12 @@ const SubscriptionPopup = () => {
           </button>
           <button
             className={`flex-1 font-bold py-3 rounded-md uppercase text-xs md:text-base transition ${
-              selectedPlan === 'freemium' || isLoading
+              selectedPlan === 'pay_per_deal' || isLoading
                 ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
                 : 'bg-[#9afa00] text-black hover:bg-[#baff32]'
             }`}
             onClick={handleSubscribe}
-            disabled={selectedPlan === 'freemium' || isLoading}
+            disabled={selectedPlan === 'pay_per_deal' || isLoading}
           >
             {isLoading ? 'Processing...' : 'Subscribe Now'}
           </button>
