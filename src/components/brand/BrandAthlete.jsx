@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes, FaChevronLeft, FaChevronRight, FaCommentDots } from 'react-icons/fa';
+import { FaTiktok, FaFacebookF, FaInstagram, FaLock, FaTrophy, FaBriefcase, FaTimes, FaChevronLeft, FaChevronRight, FaCommentDots, FaLinkedin } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getAllAthletes } from '../../services/athleteService';
+import { getAllAthletes, getAthleteProfile } from '../../services/athleteService';
 import socketService from '../../services/socketService';
 import subscriptionService from '../../services/subscriptionService';
 
@@ -73,6 +73,7 @@ const BrandAthlete = () => {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showAthleteModal, setShowAthleteModal] = useState(false);
   const [selectedAthlete, setSelectedAthlete] = useState(null);
+  const [athleteProfileLoading, setAthleteProfileLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('bronze');
   const [payAnnually, setPayAnnually] = useState(false);
   
@@ -157,6 +158,33 @@ const BrandAthlete = () => {
 
   const handlePageChange = (newPage) => {
     setFilters(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handleViewProfile = async (athlete) => {
+    setAthleteProfileLoading(true);
+    try {
+      const response = await getAthleteProfile(athlete.id);
+      if (response.success && response.athleteData) {
+        // Merge the API data with the existing athlete data
+        const updatedAthlete = {
+          ...athlete,
+          ...response.athleteData.user,
+          athleteProfile: {
+            ...athlete.athleteProfile,
+            ...response.athleteData.athleteProfile
+          }
+        };
+        setSelectedAthlete(updatedAthlete);
+        setShowAthleteModal(true);
+      } else {
+        toast.error('Failed to load athlete profile');
+      }
+    } catch (error) {
+      console.error('Error fetching athlete profile:', error);
+      toast.error('Failed to load athlete profile 2');
+    } finally {
+      setAthleteProfileLoading(false);
+    }
   };
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
@@ -382,13 +410,11 @@ const BrandAthlete = () => {
                     
                     {/* View Profile Button */}
                     <button
-                      className="w-full font-bold py-2.5 rounded-md uppercase text-xs md:text-sm transition-all duration-200 shadow-md cursor-pointer bg-[#9afa00] text-black hover:bg-[#baff32] hover:shadow-lg"
-                      onClick={() => {
-                        setSelectedAthlete(athlete);
-                        setShowAthleteModal(true);
-                      }}
+                      className="w-full font-bold py-2.5 rounded-md uppercase text-xs md:text-sm transition-all duration-200 shadow-md cursor-pointer bg-[#9afa00] text-black hover:bg-[#baff32] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => handleViewProfile(athlete)}
+                      disabled={athleteProfileLoading}
                     >
-                      View Profile
+                      {athleteProfileLoading ? 'Loading...' : 'View Profile'}
                     </button>
                   </div>
                 </div>
@@ -563,18 +589,23 @@ const BrandAthlete = () => {
                   {/* Social Media Links */}
                   <div className="flex gap-3 mb-4">
                     {selectedAthlete.athleteProfile?.instagram && (
-                      <a href={`https://instagram.com/${selectedAthlete.athleteProfile.instagram}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
+                      <a href={`${selectedAthlete.athleteProfile.instagram}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
                         <FaInstagram className="text-[#9afa00] hover:text-black text-lg" />
                       </a>
                     )}
                     {selectedAthlete.athleteProfile?.tiktok && (
-                      <a href={`https://tiktok.com/@${selectedAthlete.athleteProfile.tiktok}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
+                      <a href={`${selectedAthlete.athleteProfile.tiktok}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
                         <FaTiktok className="text-[#9afa00] hover:text-black text-lg" />
                       </a>
                     )}
                     {selectedAthlete.athleteProfile?.facebook && (
-                      <a href={`https://facebook.com/${selectedAthlete.athleteProfile.facebook}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
+                      <a href={`${selectedAthlete.athleteProfile.facebook}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
                         <FaFacebookF className="text-[#9afa00] hover:text-black text-lg" />
+                      </a>
+                    )}
+                    {selectedAthlete.athleteProfile?.instagram && (
+                      <a href={`${selectedAthlete.athleteProfile.linkedin}`} target="_blank" rel="noopener noreferrer" className="bg-[#181c1a] hover:bg-[#9afa00] hover:text-black p-3 rounded-full transition-all duration-200">
+                        <FaLinkedin className="text-[#9afa00] hover:text-black text-lg" />
                       </a>
                     )}
                   </div>
@@ -596,7 +627,7 @@ const BrandAthlete = () => {
               {/* Detailed Information Sections */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Personal Information */}
-                <div className="bg-[#232626] rounded-xl p-4">
+                {/* <div className="bg-[#232626] rounded-xl p-4">
                   <h3 className="text-[#9afa00] text-lg font-bold mb-4 flex items-center gap-2">
                     <FaTrophy className="text-[#9afa00]" />
                     Personal Information
@@ -633,7 +664,7 @@ const BrandAthlete = () => {
                       </div>
                     )}
                   </div>
-                </div>
+                </div> */}
                 
                 {/* Athletic Information */}
                 <div className="bg-[#232626] rounded-xl p-4">
@@ -682,35 +713,41 @@ const BrandAthlete = () => {
                         <div className="text-white">{selectedAthlete.athleteProfile.contentNiche}</div>
                       </div>
                     )}
-                    {selectedAthlete.athleteProfile?.followersCount && (
-                      <div>
-                        <span className="text-gray-400 text-sm">Total Followers:</span>
-                        <div className="text-white">{selectedAthlete.athleteProfile.followersCount}</div>
-                      </div>
-                    )}
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       {selectedAthlete.athleteProfile?.instagram && (
                         <div>
                           <span className="text-gray-400">Instagram:</span>
-                          <div className="text-white truncate">@{selectedAthlete.athleteProfile.instagram}</div>
+                          <div className="text-white truncate">{selectedAthlete.athleteProfile.instagramFollowersDisplay}</div>
                         </div>
                       )}
-                      {selectedAthlete.athleteProfile?.tiktok && (
+                      {selectedAthlete.athleteProfile?.facebook && (
                         <div>
-                          <span className="text-gray-400">TikTok:</span>
-                          <div className="text-white truncate">@{selectedAthlete.athleteProfile.tiktok}</div>
+                          <span className="text-gray-400">Facebook:</span>
+                          <div className="text-white truncate">{selectedAthlete.athleteProfile.instagramFollowersDisplay}</div>
                         </div>
                       )}
                       {selectedAthlete.athleteProfile?.twitter && (
                         <div>
                           <span className="text-gray-400">Twitter:</span>
-                          <div className="text-white truncate">@{selectedAthlete.athleteProfile.twitter}</div>
+                          <div className="text-white truncate">{selectedAthlete.athleteProfile.twitterFollowersDisplay}</div>
                         </div>
                       )}
                       {selectedAthlete.athleteProfile?.youtube && (
                         <div>
                           <span className="text-gray-400">YouTube:</span>
-                          <div className="text-white truncate">{selectedAthlete.athleteProfile.youtube}</div>
+                          <div className="text-white truncate">{selectedAthlete.athleteProfile.youtubeFollowersDisplay}</div>
+                        </div>
+                      )}
+                      {selectedAthlete.athleteProfile?.linkedin && (
+                        <div>
+                          <span className="text-gray-400">LinkedIn:</span>
+                          <div className="text-white truncate">{selectedAthlete.athleteProfile.linkedinFollowersDisplay}</div>
+                        </div>
+                      )}
+                      {selectedAthlete.athleteProfile?.tiktok && (
+                        <div>
+                          <span className="text-gray-400">TikTok:</span>
+                          <div className="text-white truncate">{selectedAthlete.athleteProfile.tiktokFollowersDisplay}</div>
                         </div>
                       )}
                     </div>

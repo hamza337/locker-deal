@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AthleteDashboardHome from '../../components/athlete/AthleteDashboardHome';
 import AthleteCampaigns from '../../components/athlete/AthleteCampaigns';
 import AthleteContracts from '../../components/athlete/AthleteContracts';
@@ -16,12 +16,25 @@ const TABS = [
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check for tab query parameter
+    const urlParams = new URLSearchParams(location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['dashboard', 'campaigns', 'contracts'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
 
   const handleTabClick = (tabKey) => {
     if (tabKey === 'chats') {
       navigate('/chats');
     } else {
       setActiveTab(tabKey);
+      // Update URL without page reload
+      const newUrl = tabKey === 'dashboard' ? '/dashboard' : `/dashboard?tab=${tabKey}`;
+      window.history.replaceState(null, '', newUrl);
     }
   };
 

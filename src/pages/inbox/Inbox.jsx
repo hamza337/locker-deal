@@ -117,6 +117,7 @@ const Inbox = () => {
     title: '',
     amount: '',
     expiryDate: '',
+    signingValidUntil: '',
     paymentResponsibility: 'brand',
     contractFile: null
   });
@@ -542,7 +543,48 @@ const Inbox = () => {
     };
   }, [selectedChat, chats]); // Include chats in dependency for sender name lookup
 
-
+  // Handle contract analysis from athlete contracts page
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const isContractAnalysis = urlParams.get('contract') === 'true';
+    const shouldShowAI = urlParams.get('tab') === 'ai-assistant';
+    
+    if (isAthlete && isContractAnalysis && shouldShowAI) {
+      // Switch to AI assistant tab
+      setActiveTab('ai-assistant');
+      
+      // Check for pending contract analysis data
+      const pendingAnalysis = localStorage.getItem('pendingContractAnalysis');
+      if (pendingAnalysis) {
+        try {
+          const contractData = JSON.parse(pendingAnalysis);
+          
+          // Convert base64 back to file
+          fetch(contractData.fileData)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], contractData.file.name, { type: contractData.file.type });
+              
+              // Upload the file to AI assistant
+              handleContractAnalysis(file, contractData);
+              
+              // Clean up localStorage
+              localStorage.removeItem('pendingContractAnalysis');
+            })
+            .catch(error => {
+              console.error('Error processing contract file:', error);
+              toast.error('Failed to process contract file');
+            });
+        } catch (error) {
+          console.error('Error parsing contract analysis data:', error);
+          toast.error('Failed to load contract analysis data');
+        }
+      }
+      
+      // Clean up URL parameters
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, isAthlete, navigate]);
 
   // Function to fetch chat list from API
   const fetchChatList = async () => {
@@ -550,12 +592,24 @@ const Inbox = () => {
       setLoadingChats(true);
       const chatData = await getChatList();
 
+      // Determine athlete role from localStorage to avoid stale state during initial mount
+      const userStr = localStorage.getItem('user');
+      let isAthleteLocal = isAthlete;
+      try {
+        if (userStr) {
+          const parsedUser = JSON.parse(userStr);
+          isAthleteLocal = parsedUser?.role === 'athlete';
+        }
+      } catch (e) {
+        console.warn('Failed to parse user from localStorage', e);
+      }
+
       // Transform API data to match component structure
       const transformedChats = chatData.map((chat, index) => {
         let displayName = 'Unknown';
         let profileImage = '/user.png'; // Default fallback
-        
-        if (isAthlete) {
+        // debugger
+        if (isAthleteLocal) {
           // For athletes, show brand profile data
           if (chat.user.brandProfile) {
             displayName = `${chat.user.brandProfile.firstName || ''} ${chat.user.brandProfile.lastName || ''}`.trim();
@@ -1047,6 +1101,7 @@ const Inbox = () => {
       title: '',
       amount: '',
       expiryDate: '',
+      signingValidUntil: '',
       paymentResponsibility: 'brand',
       contractFile: null
     });
@@ -1088,8 +1143,16 @@ const Inbox = () => {
   };
 
   const createContract = async () => {
-    if (!contractData.title || !contractData.amount || !contractData.expiryDate || !contractFileUrl) {
+    if (!contractData.title || !contractData.amount || !contractData.expiryDate || !contractData.signingValidUntil || !contractFileUrl) {
       toast.error('Please fill in all required fields and upload a contract file');
+      return;
+    }
+
+    // Validate that signingValidUntil is a future date
+    const today = new Date();
+    const signingValidDate = new Date(contractData.signingValidUntil);
+    if (signingValidDate <= today) {
+      toast.error('Offer valid till date must be in the future');
       return;
     }
 
@@ -1109,6 +1172,7 @@ const Inbox = () => {
         title: contractData.title,
         amount: parseFloat(contractData.amount),
         expiryDate: contractData.expiryDate,
+        signingValidUntil: contractData.signingValidUntil,
         paymentResponsibility: contractData.paymentResponsibility,
         contractFileUrl: contractFileUrl
       };
@@ -1455,6 +1519,78 @@ const Inbox = () => {
     }
 
     e.target.value = '';
+  };
+
+  // Handle contract analysis from athlete contracts page
+  const handleContractAnalysis = async (file, contractData) => {
+    if (!file) return;
+
+    setIsUploadingPdf(true);
+    
+    // Add system message about contract upload
+    const uploadMessage = {
+      id: Date.now(),
+      fromMe: false,
+      text: `📄 Contract Analysis Started\nContract: ${contractData.title}\nAmount: $${contractData.amount}\nFile: ${file.name}\n\nAnalyzing contract details...`,
+      time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      isSystem: true
+    };
+    setAiMessages(prev => [...prev, uploadMessage]);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7000';
+      const response = await fetch(`${baseUrl}gpt/analyze`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.summary) {
+        // Add document to uploaded list
+        const newDocument = {
+          id: Date.now(),
+          name: file.name,
+          size: file.size,
+          uploadedAt: new Date().toLocaleTimeString(),
+          contractData: contractData
+        };
+        setUploadedDocuments(prev => [...prev, newDocument]);
+        
+        // Add AI analysis response with contract context
+        const analysisMessage = {
+          id: Date.now() + 1,
+          fromMe: false,
+          text: `📊 Contract Analysis Complete:\n\n**Contract Details:**\n• Title: ${contractData.title}\n• Amount: $${contractData.amount}\n• Expiry: ${contractData.expiryDate}\n• Payment: ${contractData.paymentResponsibility}\n\n**AI Analysis:**\n${data.summary}\n\n💡 You can now ask me specific questions about this contract!`,
+          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+          isSystem: true
+        };
+        setAiMessages(prev => [...prev, analysisMessage]);
+        
+        toast.success('Contract analyzed successfully!');
+      } else {
+        throw new Error(data.message || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('Contract analysis failed:', error);
+      const errorMessage = {
+        id: Date.now() + 2,
+        fromMe: false,
+        text: `❌ Error analyzing contract: ${error.message}`,
+        time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+        isSystem: true
+      };
+      setAiMessages(prev => [...prev, errorMessage]);
+      toast.error('Failed to analyze contract');
+    } finally {
+      setIsUploadingPdf(false);
+    }
   };
 
   const sendAiMessage = () => {
@@ -2757,6 +2893,20 @@ const Inbox = () => {
                   />
                 </div>
 
+                {/* Offer Valid Till */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <FaCalendarAlt className="text-[#9afa00]" />
+                    Offer valid till *
+                  </label>
+                  <input
+                    type="date"
+                    value={contractData.signingValidUntil}
+                    onChange={(e) => setContractData(prev => ({ ...prev, signingValidUntil: e.target.value }))}
+                    className="w-full bg-[#2a2a2a] border border-[#9afa00]/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#9afa00]/50 focus:border-[#9afa00]"
+                  />
+                </div>
+
                 {/* Payment Responsibility */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -2810,7 +2960,7 @@ const Inbox = () => {
                 </button>
                 <button
                   onClick={createContract}
-                  disabled={isCreatingContract || !contractData.title || !contractData.amount || !contractData.expiryDate || !contractFileUrl}
+                  disabled={isCreatingContract || !contractData.title || !contractData.amount || !contractData.expiryDate || !contractData.signingValidUntil || !contractFileUrl}
                   className="flex-1 bg-[#9afa00] text-black font-semibold py-3 px-6 rounded-xl hover:bg-[#8ae000] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isCreatingContract ? (

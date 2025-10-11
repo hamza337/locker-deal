@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaDownload, FaFileContract, FaCalendarAlt, FaDollarSign, FaSpinner, FaEye, FaTimes, FaPen, FaChevronDown } from 'react-icons/fa';
+import { FaDownload, FaFileContract, FaCalendarAlt, FaDollarSign, FaSpinner, FaEye, FaTimes, FaPen, FaChevronDown, FaBan, FaRobot } from 'react-icons/fa';
 import { getContracts, formatContractData } from '../../services/contractService';
 import { uploadFile } from '../../services/uploadService';
 import documentSigningService from '../../services/documentSigningService';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
 const AthleteContracts = () => {
+  const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -18,6 +20,9 @@ const AthleteContracts = () => {
   const [selectedContract, setSelectedContract] = useState(null);
   const [showContractModal, setShowContractModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
   const [signature, setSignature] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [signatureStep, setSignatureStep] = useState('draw'); // 'draw', 'preview', 'signing'
@@ -28,6 +33,13 @@ const AthleteContracts = () => {
   useEffect(() => {
     fetchContracts();
   }, [pagination.page]);
+
+  // Initialize canvas when signature modal opens
+  useEffect(() => {
+    if (showSignatureModal && canvasRef.current) {
+      initializeCanvas();
+    }
+  }, [showSignatureModal]);
 
   const fetchContracts = async () => {
     try {
@@ -47,6 +59,45 @@ const AthleteContracts = () => {
       toast.error('Failed to load contracts');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const rejectContract = async () => {
+    if (!selectedContract || !rejectionReason.trim()) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
+
+    try {
+      setIsRejecting(true);
+      toast.loading('Rejecting contract...', { id: 'contract-rejection' });
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL;
+      const token = localStorage.getItem('access_token');
+      
+      await axios.patch(
+        `${baseUrl}contracts/${selectedContract.id}/reject-by-athlete`,
+        {
+          reason: rejectionReason.trim()
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      toast.success('Contract rejected successfully!', { id: 'contract-rejection' });
+      closeRejectModal();
+      
+      // Refresh contracts list
+      fetchContracts();
+      
+    } catch (error) {
+      console.error('Error rejecting contract:', error);
+      toast.error('Failed to reject contract: ' + (error.response?.data?.message || error.message), { id: 'contract-rejection' });
+      setIsRejecting(false);
     }
   };
 
@@ -108,6 +159,19 @@ const AthleteContracts = () => {
     clearSignature();
   };
 
+  const openRejectModal = (contract) => {
+    setSelectedContract(contract);
+    setShowRejectModal(true);
+    setRejectionReason('');
+  };
+
+  const closeRejectModal = () => {
+    setShowRejectModal(false);
+    setSelectedContract(null);
+    setRejectionReason('');
+    setIsRejecting(false);
+  };
+
   const toggleDropdown = (contractId) => {
     setDropdownOpen(prev => ({
       ...prev,
@@ -129,32 +193,57 @@ const AthleteContracts = () => {
   }, []);
 
   // Signature canvas functions
+  const initializeCanvas = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+  };
+
+  const getCanvasCoordinates = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Handle both mouse and touch events
+    const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
+
   const startDrawing = (e) => {
+    e.preventDefault();
     setIsDrawing(true);
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const coords = getCanvasCoordinates(e, canvas);
     
     const ctx = canvas.getContext('2d');
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(coords.x, coords.y);
   };
 
   const draw = (e) => {
     if (!isDrawing) return;
+    e.preventDefault();
     
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const coords = getCanvasCoordinates(e, canvas);
     
     const ctx = canvas.getContext('2d');
-    ctx.lineTo(x, y);
+    ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e) => {
+    if (e) e.preventDefault();
     setIsDrawing(false);
   };
 
@@ -231,6 +320,60 @@ const AthleteContracts = () => {
       console.error('Error signing contract:', error);
       toast.error('Failed to sign contract: ' + (error.response?.data?.message || error.message), { id: 'contract-signing' });
       setSignatureStep('draw');
+    }
+  };
+
+  // Function to ask AI about the contract
+  const askAIAboutContract = async (contract) => {
+    if (!contract.contractFileUrl) {
+      toast.error('Contract file not available');
+      return;
+    }
+
+    try {
+      toast.loading('Fetching contract content for AI analysis...');
+      
+      // Fetch the PDF content
+      const response = await fetch(contract.contractFileUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch contract file');
+      }
+      
+      const blob = await response.blob();
+      const file = new File([blob], `${contract.title}-contract.pdf`, { type: 'application/pdf' });
+      
+      // Store contract data and file in localStorage for the AI assistant
+      const contractData = {
+        title: contract.title,
+        brand: contract.brand,
+        amount: contract.amount,
+        status: contract.status,
+        file: {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        },
+        message: `Please analyze this contract: "${contract.title}" from ${contract.brand}. The contract amount is ${contract.amount} and current status is ${contract.status}. I would like to understand the key terms, obligations, and any important details I should be aware of before signing.`
+      };
+      
+      // Store the file as base64 for transfer
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        contractData.fileData = e.target.result;
+        localStorage.setItem('pendingContractAnalysis', JSON.stringify(contractData));
+        
+        toast.dismiss();
+        toast.success('Redirecting to AI Assistant...');
+        
+        // Navigate to chats with AI assistant tab
+        navigate('/chats?tab=ai-assistant&contract=true');
+      };
+      reader.readAsDataURL(file);
+      
+    } catch (error) {
+      console.error('Error preparing contract for AI analysis:', error);
+      toast.dismiss();
+      toast.error('Failed to prepare contract for AI analysis');
     }
   };
 
@@ -473,7 +616,7 @@ const AthleteContracts = () => {
               )}
 
               {/* Rejection Reason - Only show if status is Pending Signature and rejection reason exists */}
-              {selectedContract.status === 'pending_athlete_signature' && selectedContract.rejectionReason && (
+              {selectedContract.status === 'Pending Signature' && selectedContract.rejectionReason && (
                 <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                   <label className="block text-red-400 text-sm font-medium mb-2">Rejection Reason</label>
                   <div className="text-red-300">{selectedContract.rejectionReason}</div>
@@ -524,17 +667,47 @@ const AthleteContracts = () => {
                   <div className="text-white">{selectedContract.expiryDate}</div>
                 </div>
               </div>
+              
+              {selectedContract.signingValidUntil && selectedContract.signingValidUntil !== 'N/A' && (
+                <div>
+                  <label className="block text-gray-400 text-sm font-medium mb-2">Offer valid till</label>
+                  <div className={`font-semibold ${selectedContract.status === 'Expired' ? 'text-red-400' : 'text-white'}`}>
+                    {selectedContract.signingValidUntil}
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-700">
-                {!selectedContract.signedContractFileUrl && (
-                   <button
-                     onClick={() => openSignatureModal(selectedContract)}
-                     className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-md font-bold hover:bg-blue-700 transition"
-                   >
-                     <FaPen /> Sign Contract
-                   </button>
-                 )}
+                {selectedContract.status === 'Expired' ? (
+                  <div className="flex-1 text-center py-3 px-4 bg-red-900/30 border border-red-600 rounded-md">
+                    <span className="text-red-400 font-semibold">Contract offer has expired</span>
+                  </div>
+                ) : (
+                  !selectedContract.signedContractFileUrl && selectedContract.status === 'Pending Signature' && (
+                    <>
+                      <button
+                        onClick={() => askAIAboutContract(selectedContract)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-[#9afa00] text-black px-4 py-3 rounded-md font-bold hover:bg-[#7dd800] transition"
+                        title="Ask AI about this contract"
+                      >
+                        <FaRobot /> Ask AI
+                      </button>
+                      <button
+                        onClick={() => openSignatureModal(selectedContract)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-md font-bold hover:bg-blue-700 transition"
+                      >
+                        <FaPen /> Sign Contract
+                      </button>
+                      <button
+                        onClick={() => openRejectModal(selectedContract)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-3 rounded-md font-bold hover:bg-red-700 transition"
+                      >
+                        <FaBan /> Reject Contract
+                      </button>
+                    </>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -600,12 +773,20 @@ const AthleteContracts = () => {
                          ref={canvasRef}
                          width={600}
                          height={200}
-                         className="border border-gray-300 rounded cursor-crosshair w-full"
+                         className="border border-gray-300 rounded cursor-crosshair"
                          onMouseDown={startDrawing}
                          onMouseMove={draw}
                          onMouseUp={stopDrawing}
                          onMouseLeave={stopDrawing}
-                         style={{ touchAction: 'none' }}
+                         onTouchStart={startDrawing}
+                         onTouchMove={draw}
+                         onTouchEnd={stopDrawing}
+                         style={{ 
+                           touchAction: 'none',
+                           width: '100%',
+                           height: 'auto',
+                           maxWidth: '600px'
+                         }}
                        />
                        <div className="flex gap-3 mt-4">
                          <button
@@ -666,6 +847,83 @@ const AthleteContracts = () => {
                    <FaSpinner className="animate-spin text-[#9afa00] text-4xl mx-auto mb-4" />
                    <h4 className="text-white text-lg font-semibold mb-2">Signing Contract...</h4>
                    <p className="text-gray-400">Please wait while we process your signature</p>
+                 </div>
+               )}
+             </div>
+           </div>
+         </div>
+       )}
+
+       {/* Rejection Modal */}
+       {showRejectModal && selectedContract && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-[#1a1a1a] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+             <div className="flex justify-between items-center p-6 border-b border-gray-700">
+               <h3 className="text-xl font-bold text-red-400">Reject Contract</h3>
+               <button
+                 onClick={closeRejectModal}
+                 className="text-gray-400 hover:text-white transition"
+                 disabled={isRejecting}
+               >
+                 <FaTimes className="text-xl" />
+               </button>
+             </div>
+             
+             <div className="p-6">
+               {!isRejecting ? (
+                 <div className="space-y-6">
+                   {/* Contract Info */}
+                   <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                     <h4 className="text-white font-semibold mb-2">{selectedContract.title}</h4>
+                     <p className="text-gray-400 text-sm">Brand: {selectedContract.brand}</p>
+                     <p className="text-gray-400 text-sm">Amount: {selectedContract.amount}</p>
+                   </div>
+
+                   {/* Warning Message */}
+                   <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4">
+                     <p className="text-yellow-300 text-sm">
+                       <strong>Warning:</strong> Rejecting this contract will notify the brand and cannot be undone. 
+                       Please provide a clear reason for your rejection.
+                     </p>
+                   </div>
+
+                   {/* Rejection Reason */}
+                   <div>
+                     <label className="block text-white font-semibold mb-3">Reason for Rejection *</label>
+                     <textarea
+                       value={rejectionReason}
+                       onChange={(e) => setRejectionReason(e.target.value)}
+                       placeholder="Please explain why you are rejecting this contract..."
+                       className="w-full bg-[#2a2a2a] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-red-500 transition-colors min-h-[120px] resize-vertical"
+                       maxLength={500}
+                     />
+                     <div className="text-right text-gray-400 text-sm mt-1">
+                       {rejectionReason.length}/500 characters
+                     </div>
+                   </div>
+
+                   {/* Action Buttons */}
+                   <div className="flex gap-3 pt-4">
+                     <button
+                       onClick={closeRejectModal}
+                       className="flex-1 bg-gray-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-700 transition"
+                     >
+                       Cancel
+                     </button>
+                     <button
+                       onClick={rejectContract}
+                       disabled={!rejectionReason.trim()}
+                       className="flex-1 bg-red-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                       Reject Contract
+                     </button>
+                   </div>
+                 </div>
+               ) : (
+                 <div className="text-center py-12">
+                   <FaSpinner className="animate-spin text-red-400 text-4xl mx-auto mb-4" />
+                   <h4 className="text-white text-lg font-semibold mb-2">Rejecting Contract...</h4>
+                   <p className="text-gray-400">Please wait while we process your rejection</p>
                  </div>
                )}
              </div>

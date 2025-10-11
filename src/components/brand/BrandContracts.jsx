@@ -24,7 +24,8 @@ const BrandContracts = () => {
     amount: '',
     paymentResponsibility: '',
     contractFile: null,
-    expiryDate: ''
+    expiryDate: '',
+    signingValidUntil: ''
   });
   const [uploadingFile, setUploadingFile] = useState(false);
   const [currentContractFileName, setCurrentContractFileName] = useState('');
@@ -177,6 +178,16 @@ const BrandContracts = () => {
       return;
     }
 
+    if (!editFormData.signingValidUntil) {
+      toast.error('Offer valid till date is required');
+      return;
+    }
+
+    if (new Date(editFormData.signingValidUntil) <= new Date()) {
+      toast.error('Offer valid till date must be in the future');
+      return;
+    }
+
     try {
       toast.loading('Updating contract...', { id: 'contract-edit' });
       
@@ -194,6 +205,10 @@ const BrandContracts = () => {
 
       if (editFormData.expiryDate) {
         updateData.expiryDate = editFormData.expiryDate;
+      }
+
+      if (editFormData.signingValidUntil) {
+        updateData.signingValidUntil = editFormData.signingValidUntil;
       }
 
       // Handle file upload if a new file is selected
@@ -245,7 +260,8 @@ const BrandContracts = () => {
       amount: contract.amount ? contract.amount.replace(/[^0-9.]/g, '') : '',
       paymentResponsibility: contract.paymentResponsibility || '',
       contractFile: null,
-      expiryDate: contract.expiryDate ? new Date(contract.expiryDate).toISOString().split('T')[0] : ''
+      expiryDate: contract.expiryDate ? new Date(contract.expiryDate).toISOString().split('T')[0] : '',
+      signingValidUntil: contract.signingValidUntil ? new Date(contract.signingValidUntil).toISOString().split('T')[0] : ''
     });
     setShowEditModal(true);
   };
@@ -257,7 +273,8 @@ const BrandContracts = () => {
       amount: '',
       paymentResponsibility: '',
       contractFile: null,
-      expiryDate: ''
+      expiryDate: '',
+      signingValidUntil: ''
     });
     setUploadingFile(false);
     setCurrentContractFileName('');
@@ -602,9 +619,31 @@ const BrandContracts = () => {
                    <div className="text-white">{selectedContract.expiryDate}</div>
                  </div>
                </div>
+               
+               {selectedContract.signingValidUntil && selectedContract.signingValidUntil !== 'N/A' && (
+                 <div>
+                   <label className="block text-gray-400 text-sm font-medium mb-2">Offer valid till</label>
+                   <div className={`font-semibold ${selectedContract.status === 'Expired' ? 'text-red-400' : 'text-white'}`}>
+                     {selectedContract.signingValidUntil}
+                   </div>
+                 </div>
+               )}
+
+               {/* Rejection Reason */}
+               {selectedContract.rejectionReason && selectedContract.signed && (
+                 <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                   <label className="block text-red-400 text-sm font-medium mb-2">Rejection Reason</label>
+                   <div className="text-red-300">{selectedContract.rejectionReason}</div>
+                 </div>
+               )}
 
                {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-700">
+                  {selectedContract.status === 'Expired' && (
+                    <div className="flex-1 text-center py-3 px-4 bg-gray-800 text-gray-400 rounded-md">
+                      Contract offer has expired
+                    </div>
+                  )}
                   {selectedContract.status === 'pending_brand_approval' && (
                     <>
                       <button
@@ -621,12 +660,12 @@ const BrandContracts = () => {
                       </button>
                     </>
                   )}
-                  {selectedContract.status === 'Pending Signature' && (
+                  {(selectedContract.status === 'Pending Signature' || selectedContract.status === 'rejected_by_athlete') && (
                     <button
                       onClick={() => openEditModal(selectedContract)}
                       className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-md font-bold hover:bg-blue-700 transition"
                     >
-                      <FaEdit /> Edit Contract
+                      <FaEdit /> {selectedContract.status === 'rejected_by_athlete' ? 'Edit & Resubmit Contract' : 'Edit Contract'}
                     </button>
                   )}
                   {selectedContract.status === 'pending_payment' && (
@@ -763,6 +802,17 @@ const BrandContracts = () => {
                    value={editFormData.expiryDate}
                    onChange={(e) => setEditFormData({...editFormData, expiryDate: e.target.value})}
                    className="w-full bg-[#232626] border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:border-[#9afa00]"
+                 />
+               </div>
+               
+               <div>
+                 <label className="block text-gray-400 text-sm font-medium mb-2">Offer valid till *</label>
+                 <input
+                   type="date"
+                   value={editFormData.signingValidUntil}
+                   onChange={(e) => setEditFormData({...editFormData, signingValidUntil: e.target.value})}
+                   className="w-full bg-[#232626] border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:border-[#9afa00]"
+                   min={new Date().toISOString().split('T')[0]}
                  />
                </div>
                

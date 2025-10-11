@@ -7,6 +7,7 @@ import { uploadFile } from '../../services/uploadService';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import subscriptionService from '../../services/subscriptionService';
+import { updateAccountSettings } from '../../services/accountService';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,6 +28,14 @@ const Navbar = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMfaLoading, setIsMfaLoading] = useState(false);
+  const [brandFormData, setBrandFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    is2FAEnabled: false
+  });
   const [athleteFormData, setAthleteFormData] = useState({
     firstName: '',
     lastName: '',
@@ -48,7 +57,8 @@ const Navbar = () => {
     contentNiche: '',
     pastCollaborations: '',
     brandPreferences: '',
-    uniquePitch: ''
+    uniquePitch: '',
+    is2FAEnabled: false
   });
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -82,7 +92,20 @@ const Navbar = () => {
           contentNiche: parsedUser.athleteProfile.contentNiche || '',
           pastCollaborations: parsedUser.athleteProfile.pastCollaborations || '',
           brandPreferences: parsedUser.athleteProfile.brandPreferences || '',
-          uniquePitch: parsedUser.athleteProfile.uniquePitch || ''
+          uniquePitch: parsedUser.athleteProfile.uniquePitch || '',
+          is2FAEnabled: parsedUser.is2FAEnabled || false
+        });
+      }
+      
+      // Populate brand form data if user is brand
+      if (parsedUser.role === 'brand') {
+        // debugger
+        setBrandFormData({
+          firstName: parsedUser.brandProfile?.firstName || parsedUser.firstName || '',
+          lastName: parsedUser.brandProfile?.lastName || parsedUser.lastName || '',
+          email: parsedUser.email || '',
+          phoneNumber: parsedUser.brandProfile?.phoneNumber || parsedUser.phoneNumber || '',
+          is2FAEnabled: parsedUser.is2FAEnabled || false
         });
       }
     }
@@ -106,13 +129,16 @@ const Navbar = () => {
     } else if (userData?.role === 'brand') {
       // Check if brandProfile exists and has name data
       if (userData?.brandProfile) {
-        const brandName = userData.brandProfile.brandName || userData.brandProfile.companyName;
-        if (brandName) {
-          return brandName;
+        const firstName = userData.brandProfile.firstName;
+        const lastName = userData.brandProfile.lastName;
+        if (firstName && lastName) {
+          return `${firstName} ${lastName}`;
+        } else if (firstName) {
+          return firstName;
         }
       }
-      // Fallback for null brandProfile
-      return 'Brand';
+      // Fallback for null athleteProfile
+      return 'Professional Athlete';
     }
     return 'Athlete';
   };
@@ -121,8 +147,38 @@ const Navbar = () => {
     return userData?.email || 'user@professional.com';
   };
 
+  // Helper: get followers count for each social platform from athlete profile
+  const getSocialFollowers = (platform) => {
+    const profile = userData?.athleteProfile;
+    if (!profile) return undefined;
+    switch (platform) {
+      case 'instagram':
+        return profile.instagramFollowersDisplay ?? profile.instagramFollowersDisplay ?? profile.instagram_followers;
+      case 'tiktok':
+        return profile.tiktokFollowersDisplay ?? profile.tiktokFollowersDisplay;
+      case 'twitter':
+        return profile.twitterFollowersDisplay ?? profile.twitterFollowersDisplay ?? profile.twitter_followers;
+      case 'youtube':
+        return profile.youtubeFollowersDisplay ?? profile.youtubeFollowersDisplay ?? profile.youtube_subscribers;
+      case 'linkedin':
+        return profile.linkedinFollowersDisplay ?? profile.linkedinFollowersDisplay;
+      case 'facebook':
+        return profile.facebookFollowersDisplay ?? profile.facebookFollowersDisplay;
+      default:
+        return undefined;
+    }
+  };
+
+  const renderFollowers = (platform) => {
+    const count = getSocialFollowers(platform);
+    return typeof count === 'number' || (typeof count === 'string' && count !== '')
+      ? ` (${count})`
+      : '';
+  };
+
   const getUserProfileImage = () => {
     if (userData?.role === 'athlete') {
+      // debugger
       // Check if athleteProfile exists and has profile picture
       if (userData?.athleteProfile?.profilePictureUrl) {
         return userData.athleteProfile.profilePictureUrl;
@@ -180,7 +236,8 @@ const Navbar = () => {
           toast.success('Subscription cancelled successfully. You are now on Pay Per Deal.');
           // Update user data to reflect the change
           const updatedUserData = { ...userData, subscriptionPlan: 'PAY_PER_DEAL' };
-          localStorage.setItem('userData', JSON.stringify(updatedUserData));
+          localStorage.setItem('user', JSON.stringify(updatedUserData));
+          setUserData(updatedUserData);
           window.location.reload(); // Refresh to update UI
         } else {
           const errorData = await response.json();
@@ -204,6 +261,61 @@ const Navbar = () => {
     }));
   };
 
+  const handleBrandInputChange = (e) => {
+    const { name, value } = e.target;
+    setBrandFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleMfaToggle = async (e) => {
+    const isEnabled = e.target.checked;
+    setIsMfaLoading(true);
+    
+    try {
+      await updateAccountSettings({ is2FAEnabled: isEnabled });
+      setBrandFormData(prev => ({
+        ...prev,
+        is2FAEnabled: isEnabled
+      }));
+      toast.success(`MFA ${isEnabled ? 'enabled' : 'disabled'} successfully!`);
+    } catch (error) {
+      console.error('Error updating MFA:', error);
+      // Revert checkbox state on error
+      e.target.checked = !isEnabled;
+    } finally {
+      setIsMfaLoading(false);
+    }
+  };
+
+  // Athlete MFA toggle (apply same account settings API)
+  const handleAthleteMfaToggle = async (e) => {
+    const isEnabled = e.target.checked;
+    setIsMfaLoading(true);
+    try {
+      await updateAccountSettings({ is2FAEnabled: isEnabled });
+      setAthleteFormData(prev => ({
+        ...prev,
+        is2FAEnabled: isEnabled
+      }));
+      // Sync to user data and localStorage
+      const updatedUser = { ...userData, is2FAEnabled: isEnabled };
+      setUserData(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      toast.success(`MFA ${isEnabled ? 'enabled' : 'disabled'} successfully!`);
+    } catch (error) {
+      console.error('Error updating MFA:', error);
+      // Revert checkbox state on error by restoring previous state
+      setAthleteFormData(prev => ({
+        ...prev,
+        is2FAEnabled: !isEnabled
+      }));
+    } finally {
+      setIsMfaLoading(false);
+    }
+  };
+
   // Update athlete profile
   const updateAthleteProfile = async () => {
     try {
@@ -214,7 +326,16 @@ const Navbar = () => {
         return;
       }
 
-      const updateData = { ...athleteFormData };
+      // Build update payload without followersCount and is2FAEnabled (account-level)
+      const { followersCount, is2FAEnabled, ...restAthleteData } = athleteFormData;
+      const updateData = { ...restAthleteData };
+
+      // Update account settings for MFA (2FA)
+      try {
+        await updateAccountSettings({ is2FAEnabled: athleteFormData.is2FAEnabled });
+      } catch (mfaError) {
+        console.error('Error updating MFA settings:', mfaError);
+      }
       
       // Add profile image URL if it exists
       if (profileImage && profileImage !== 'https://randomuser.me/api/portraits/men/32.jpg') {
@@ -236,6 +357,7 @@ const Navbar = () => {
         // Update localStorage with new data
         const updatedUserData = {
           ...userData,
+          is2FAEnabled: athleteFormData.is2FAEnabled,
           athleteProfile: {
             ...userData.athleteProfile,
             ...updateData
@@ -249,6 +371,66 @@ const Navbar = () => {
       }
     } catch (error) {
       console.error('Error updating athlete profile:', error);
+      toast.error('Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Update brand profile
+  const updateBrandProfile = async () => {
+    try {
+      setIsSaving(true);
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+  
+      // Only allow firstName, lastName, phoneNumber to be updated
+      const updateData = {
+        firstName: brandFormData.firstName,
+        lastName: brandFormData.lastName,
+        phoneNumber: brandFormData.phoneNumber
+      };
+
+      // Also allow updating profile picture URL if available
+      if (profileImage && profileImage !== 'https://randomuser.me/api/portraits/men/32.jpg') {
+        updateData.profilePictureUrl = profileImage;
+      }
+  
+      const response = await axios.patch(
+        `${baseUrl}users/brand-profile`,
+        updateData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+  
+      if (response.status === 200) {
+        // Update localStorage with new data
+        const updatedUserData = {
+          ...userData,
+          brandProfile: {
+            ...userData.brandProfile,
+            ...updateData
+          },
+          // keep top-level fields in sync if present
+          firstName: updateData.firstName,
+          lastName: updateData.lastName,
+          phoneNumber: updateData.phoneNumber
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUserData));
+        setUserData(updatedUserData);
+  
+        toast.success('Profile updated successfully!');
+        setProfileModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error updating brand profile:', error);
       toast.error('Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);
@@ -424,7 +606,7 @@ const Navbar = () => {
             <div className="absolute right-0 mt-2 w-40 bg-[#232626] rounded-lg shadow-lg py-2 z-50 border border-[#9afa00] animate-fadeIn">
               <button
                 className="w-full text-left px-4 py-2 text-white hover:bg-[#181c1a] transition text-sm"
-                onClick={() => { setMenuOpen(false); setProfileModalOpen(true); }}
+                onClick={() => { setMenuOpen(false); setActiveTab(userData?.role === 'athlete' ? 'personal' : 'brand'); setProfileModalOpen(true); }}
               >
                 View Profile
               </button>
@@ -753,7 +935,7 @@ const Navbar = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
-                                  <FaInstagram className="text-pink-500" /> Instagram Handle
+                                  <FaInstagram className="text-pink-500" /> {`Instagram Profile${renderFollowers('instagram')}`}
                                 </label>
                                 <input 
                                   name="instagram"
@@ -765,7 +947,7 @@ const Navbar = () => {
                               </div>
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
-                                  <FaTiktok className="text-black" /> TikTok Handle
+                                  <FaTiktok className="text-black" /> {`TikTok Profile${renderFollowers('tiktok')}`}
                                 </label>
                                 <input 
                                   name="tiktok"
@@ -777,7 +959,7 @@ const Navbar = () => {
                               </div>
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
-                                  <FaTwitter className="text-blue-400" /> Twitter Handle
+                                  <FaTwitter className="text-blue-400" /> {`Twitter Profile${renderFollowers('twitter')}`}
                                 </label>
                                 <input 
                                   name="twitter"
@@ -789,7 +971,7 @@ const Navbar = () => {
                               </div>
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
-                                  <FaYoutube className="text-red-500" /> YouTube Channel
+                                  <FaYoutube className="text-red-500" /> {`YouTube Channel${renderFollowers('youtube')}`}
                                 </label>
                                 <input 
                                   name="youtube"
@@ -801,7 +983,7 @@ const Navbar = () => {
                               </div>
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
-                                  <FaLinkedin className="text-blue-600" /> LinkedIn Profile
+                                  <FaLinkedin className="text-blue-600" /> {`LinkedIn Profile${renderFollowers('linkedin')}`}
                                 </label>
                                 <input 
                                   name="linkedin"
@@ -813,7 +995,7 @@ const Navbar = () => {
                               </div>
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block flex items-center gap-2">
-                                  <FaFacebook className="text-blue-500" /> Facebook Profile
+                                  <FaFacebook className="text-blue-500" /> {`Facebook Profile${renderFollowers('facebook')}`}
                                 </label>
                                 <input 
                                   name="facebook"
@@ -823,7 +1005,7 @@ const Navbar = () => {
                                   placeholder="@your_profile"
                                 />
                               </div>
-                              <div>
+                              {/* <div>
                                 <label className="text-white text-sm md:text-base mb-1 block">Followers Count</label>
                                 <input 
                                   name="followersCount"
@@ -832,7 +1014,7 @@ const Navbar = () => {
                                   className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
                                   placeholder="e.g., 10000"
                                 />
-                              </div>
+                              </div> */}
                               <div>
                                 <label className="text-white text-sm md:text-base mb-1 block">Content Niche</label>
                                 <select 
@@ -862,14 +1044,13 @@ const Navbar = () => {
                             <h3 className="text-[#9afa00] text-xl font-bold mb-4">Multi-Factor Authentication</h3>
                             <p className="text-white text-xs md:text-sm mb-4">You can enable MFA to add an extra layer of security to your account. When you log in, you will be required to enter a code sent to your phone or email address.</p>
                             <div className="flex items-center gap-2 mb-4">
-                              <input type="checkbox" id="athlete-enable-mfa" className="accent-[#9afa00] w-4 h-4" />
-                              <label htmlFor="athlete-enable-mfa" className="text-white text-xs md:text-sm">Enable MFA</label>
+                              <input type="checkbox" id="athlete-enable-mfa" className="accent-[#9afa00] w-4 h-4" checked={athleteFormData.is2FAEnabled} onChange={handleAthleteMfaToggle} disabled={isMfaLoading} />
+                              <label htmlFor="athlete-enable-mfa" className="text-white text-xs md:text-sm">{isMfaLoading ? 'Updating...' : 'Enable MFA'}</label>
                             </div>
                             <div>
                               <label className="text-white text-xs md:text-sm mb-1 block">MFA Device</label>
                               <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
                                 <option>Email</option>
-                                <option>SMS</option>
                               </select>
                             </div>
                           </div>
@@ -878,122 +1059,80 @@ const Navbar = () => {
                     </form>
                   ) : activeTab === 'brand' && (
                     <form className="flex flex-col gap-6">
-                      {/* Brand Representatives */}
-                      <div>
-                        <span className="text-[#9afa00] font-bold text-lg flex items-center gap-2">BRAND REPRESENTATIVES <FaCheckCircle className="text-[#9afa00] text-base" /></span>
-                        <div className="text-white mt-2 text-sm md:text-base">Name: {getUserName()}</div>
-                        <div className="text-white text-sm md:text-base">Job Title: {userData?.brandProfile?.jobTitle || 'Not Specified'}</div>
-                      </div>
                       {/* Brand Identity */}
                       <div>
                         <span className="text-[#9afa00] font-bold text-lg">BRAND IDENTITY</span>
                         <div className="mt-2 flex flex-col gap-4">
                           <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Brand Name</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.brandProfile?.brandName || userData?.brandProfile?.companyName || 'Professional Brand'} />
+                            <label className="text-white text-sm md:text-base mb-1 block">First Name</label>
+                            <input 
+                              name="firstName"
+                              value={brandFormData.firstName}
+                              onChange={handleBrandInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="Enter first name"
+                            />
                           </div>
                           <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Brand Website URL</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.brandProfile?.website || 'https://professional-brand.com'} />
+                            <label className="text-white text-sm md:text-base mb-1 block">Last Name</label>
+                            <input 
+                              name="lastName"
+                              value={brandFormData.lastName}
+                              onChange={handleBrandInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="Enter last name"
+                            />
                           </div>
                           <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Brand Category</label>
-                            <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
-                              <option>{getBrandCategory()}</option>
-                            </select>
+                            <label className="text-white text-sm md:text-base mb-1 block">Email</label>
+                            <input 
+                              name="email"
+                              value={brandFormData.email}
+                              readOnly
+                              className="w-full bg-[#2a2a2a] text-gray-400 rounded-md px-3 py-2 cursor-not-allowed text-sm" 
+                              placeholder="Email address"
+                            />
                           </div>
                           <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Company Size (Employees)</label>
-                            <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
-                              <option>Media & Entertainment</option>
-                            </select>
+                            <label className="text-white text-sm md:text-base mb-1 block">Phone Number</label>
+                            <input 
+                              name="phoneNumber"
+                              value={brandFormData.phoneNumber}
+                              onChange={handleBrandInputChange}
+                              className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" 
+                              placeholder="Enter phone number"
+                            />
                           </div>
                         </div>
                       </div>
-                      {/* Social Links */}
-                      <div>
-                        <span className="text-[#9afa00] font-bold text-lg">SOCIAL LINKS</span>
-                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Instagram</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="@prosportsventures" />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Tiktok</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="@prosportsventures" />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Twitter</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="@prosportsventures" />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Facebook</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="@prosportsventures" />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Youtube</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="@prosportsventures" />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">LinkedIn</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue="@prosportsventures" />
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <label className="text-white text-sm md:text-base mb-1 block">Brand Description</label>
-                          <textarea className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm min-h-[60px]" placeholder="Type your Brand Description here" />
-                        </div>
-                      </div>
+
                     </form>
                   )}
                   {activeTab === 'account' && (
                     <form className="flex flex-col gap-6">
-                      {/* Public Display Info */}
+                      {/* Account Settings */}
                       <div>
-                        <span className="text-[#9afa00] font-bold text-lg">PUBLIC DISPLAY INFORMATION</span>
-                        <div className="mt-2 flex flex-col gap-4">
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">First Name</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.athleteProfile?.firstName || userData?.brandProfile?.firstName || 'Professional'} />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Last Name</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.athleteProfile?.lastName || userData?.brandProfile?.lastName || 'User'} />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Job Title</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.brandProfile?.jobTitle || userData?.athleteProfile?.position || 'Professional'} placeholder="Enter Job Title" />
-                          </div>
-                        </div>
-                      </div>
-                      {/* Account & Security */}
-                      <div>
-                        <span className="text-[#9afa00] font-bold text-lg">ACCOUNT & SECURITY</span>
-                        <div className="mt-2 flex flex-col gap-4">
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Email</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={getUserEmail()} />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Phone Number</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" defaultValue={userData?.athleteProfile?.phoneNumber || userData?.brandProfile?.phoneNumber || '+1 (555) 123-4567'} />
-                          </div>
-                          <div>
-                            <label className="text-white text-sm md:text-base mb-1 block">Extension</label>
-                            <input className="w-full bg-[#181c1a] text-white placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm" placeholder="Ext." />
-                          </div>
-                        </div>
+                        <span className="text-[#9afa00] font-bold text-lg">ACCOUNT SETTINGS</span>
                       </div>
                       {/* MFA */}
-                      <div className="bg-[#232626] rounded-lg p-4 mt-2">
+                      <div className="bg-[#232626] rounded-lg p-4">
                         <span className="text-[#9afa00] font-bold text-lg block mb-2">MULTI FACTOR AUTHENTICATION</span>
                         <p className="text-white text-xs md:text-sm mb-2">You can enable MFA to add an extra layer of security to your account. When you log in, you will be required to enter a code sent to your phone or email address.</p>
                         <div className="flex items-center gap-2 mb-2">
-                          <input type="checkbox" id="enable-mfa" className="accent-[#9afa00] w-4 h-4" />
-                          <label htmlFor="enable-mfa" className="text-white text-xs md:text-sm">Enable MFA</label>
+                          <input 
+                            type="checkbox" 
+                            id="enable-mfa" 
+                            className="accent-[#9afa00] w-4 h-4" 
+                            checked={brandFormData.is2FAEnabled}
+                            onChange={handleMfaToggle}
+                            disabled={isMfaLoading}
+                          />
+                          <label htmlFor="enable-mfa" className="text-white text-xs md:text-sm">
+                            {isMfaLoading ? 'Updating...' : 'Enable MFA'}
+                          </label>
                         </div>
                         <div>
-                          <label className="text-white text-xs md:text-sm mb-1 block">MPA Device</label>
+                          <label className="text-white text-xs md:text-sm mb-1 block">Preferred Method</label>
                           <select className="w-full bg-[#181c1a] text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9afa00] text-sm">
                             <option>Email</option>
                           </select>
@@ -1075,7 +1214,7 @@ const Navbar = () => {
                   <button
                     className="flex-1 bg-[#9afa00] text-black font-bold py-2 rounded-md uppercase text-xs md:text-base hover:bg-[#baff32] transition disabled:opacity-50 disabled:cursor-not-allowed"
                     type="button"
-                    onClick={userData?.role === 'athlete' ? updateAthleteProfile : undefined}
+                    onClick={userData?.role === 'athlete' ? updateAthleteProfile : updateBrandProfile}
                     disabled={isSaving}
                   >
                     {isSaving ? 'Saving...' : 'Save'}

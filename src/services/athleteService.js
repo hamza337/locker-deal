@@ -34,3 +34,16 @@ export const getAllAthletes = async (filters = {}) => {
     throw error;
   }
 };
+
+// Get individual athlete profile data
+export const getAthleteProfile = async (athleteId) => {
+  try {
+    const response = await axios.post(`${baseUrl}users/athlete/${athleteId}/view`,{}, {
+      headers: getAuthHeaders()
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching athlete profile:', error);
+    throw error;
+  }
+};

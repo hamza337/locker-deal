@@ -451,13 +451,13 @@ const AthleteForm = () => {
           
           {/* Instagram */}
           <div>
-            <label className="block text-white font-semibold mb-2" htmlFor="instagram">Instagram Handle</label>
+            <label className="block text-white font-semibold mb-2" htmlFor="instagram">Instagram Profile Link</label>
             <div className="flex items-center bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaInstagram className="text-[#9afa00] mr-3" />
               <input
                 id="instagram"
                 type="text"
-                placeholder="@yourusername"
+                placeholder="https://www.instagram.com/yourprofile/"
                 value={formData.instagram}
                 onChange={handleInputChange}
                 className="bg-transparent outline-none text-white flex-1 placeholder-gray-400"
@@ -467,13 +467,13 @@ const AthleteForm = () => {
           
           {/* TikTok */}
           <div>
-            <label className="block text-white font-semibold mb-2" htmlFor="tiktok">TikTok Handle</label>
+            <label className="block text-white font-semibold mb-2" htmlFor="tiktok">TikTok Profile Link</label>
             <div className="flex items-center bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaTiktok className="text-[#9afa00] mr-3" />
               <input
                 id="tiktok"
                 type="text"
-                placeholder="@yourusername"
+                placeholder="https://www.tiktok.com/@yourprofile/"
                 value={formData.tiktok}
                 onChange={handleInputChange}
                 className="bg-transparent outline-none text-white flex-1 placeholder-gray-400"
@@ -483,13 +483,13 @@ const AthleteForm = () => {
           
           {/* Twitter */}
           <div>
-            <label className="block text-white font-semibold mb-2" htmlFor="twitter">Twitter Handle</label>
+            <label className="block text-white font-semibold mb-2" htmlFor="twitter">Twitter Profile Link</label>
             <div className="flex items-center bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaTwitter className="text-[#9afa00] mr-3" />
               <input
                 id="twitter"
                 type="text"
-                placeholder="@yourusername"
+                placeholder="https://www.twitter.com/yourprofile/"
                 value={formData.twitter}
                 onChange={handleInputChange}
                 className="bg-transparent outline-none text-white flex-1 placeholder-gray-400"
@@ -499,13 +499,13 @@ const AthleteForm = () => {
           
           {/* Facebook */}
           <div>
-            <label className="block text-white font-semibold mb-2" htmlFor="facebook">Facebook Profile</label>
+            <label className="block text-white font-semibold mb-2" htmlFor="facebook">Facebook Profile Link</label>
             <div className="flex items-center bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaFacebook className="text-[#9afa00] mr-3" />
               <input
                 id="facebook"
                 type="text"
-                placeholder="your.profile.name"
+                placeholder="https://www.facebook.com/yourprofile/"
                 value={formData.facebook}
                 onChange={handleInputChange}
                 className="bg-transparent outline-none text-white flex-1 placeholder-gray-400"
@@ -515,7 +515,7 @@ const AthleteForm = () => {
           
           {/* LinkedIn */}
           <div>
-            <label className="block text-white font-semibold mb-2" htmlFor="linkedin">LinkedIn Profile</label>
+            <label className="block text-white font-semibold mb-2" htmlFor="linkedin">LinkedIn Profile Link</label>
             <div className="flex items-center bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaLinkedin className="text-[#9afa00] mr-3" />
               <input
@@ -531,7 +531,7 @@ const AthleteForm = () => {
           
           {/* YouTube */}
           <div>
-            <label className="block text-white font-semibold mb-2" htmlFor="youtube">YouTube Channel</label>
+            <label className="block text-white font-semibold mb-2" htmlFor="youtube">YouTube Channel Link</label>
             <div className="flex items-center bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaYoutube className="text-[#9afa00] mr-3" />
               <input
@@ -546,7 +546,7 @@ const AthleteForm = () => {
           </div>
           
           {/* Followers Count */}
-          <div>
+          {/* <div>
             <label className="block text-white font-semibold mb-2" htmlFor="followersCount">Total Followers Count</label>
             <input
               id="followersCount"
@@ -556,7 +556,7 @@ const AthleteForm = () => {
               onChange={handleInputChange}
               className="w-full bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 outline-none focus:border-[#9afa00] transition-colors"
             />
-          </div>
+          </div> */}
           
           {/* Content Niche */}
           <div>
@@ -575,7 +575,7 @@ const AthleteForm = () => {
           </div>
           
           {/* Audience Demographics */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <label className="block text-white font-semibold mb-2" htmlFor="audienceDemographics">Audience Demographics *</label>
             <div className="flex items-start bg-black bg-opacity-60 border border-gray-600 rounded-lg px-4 py-3 focus-within:border-[#9afa00] transition-colors">
               <FaUsers className="text-[#9afa00] mr-3 mt-1" />

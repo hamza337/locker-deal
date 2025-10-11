@@ -22,21 +22,35 @@ const Login = () => {
         password: password
       });
       if (response.status === 200 || response.status === 201) {
-        const { access_token, user } = response.data;
+        const responseData = response.data;
         
-        // Store access token and user data in localStorage
-        localStorage.setItem('access_token', access_token);
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        toast.success('Login successful!');
-        
-        // Navigate based on user role
-        if (user.role === 'athlete') {
-          navigate('/dashboard');
-        } else if (user.role === 'brand') {
-          navigate('/brand/dashboard');
+        // Check if this is a 2FA response (only contains message)
+        if (responseData.message && responseData.message.includes('2FA OTP sent')) {
+          // 2FA is enabled, redirect to 2FA verification with email
+          toast.success(responseData.message);
+          navigate('/two-factor-auth', { 
+            state: { 
+              email: email
+            } 
+          });
         } else {
-          navigate('/dashboard'); // Default fallback
+          // Normal login response with access_token and user data
+          const { access_token, user } = responseData;
+          
+          // Store access token and user data in localStorage
+          localStorage.setItem('access_token', access_token);
+          localStorage.setItem('user', JSON.stringify(user));
+          
+          toast.success('Login successful!');
+          
+          // Navigate based on user role
+          if (user.role === 'athlete') {
+            navigate('/dashboard');
+          } else if (user.role === 'brand') {
+            navigate('/brand/dashboard');
+          } else {
+            navigate('/dashboard'); // Default fallback
+          }
         }
       }
     } catch (error) {

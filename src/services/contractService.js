@@ -46,6 +46,12 @@ export const formatContractData = (contract) => {
     }).format(parseFloat(amount));
   };
 
+  const isContractExpired = (signingValidUntil, currentStatus) => {
+    if (!signingValidUntil) return false;
+    if (currentStatus === 'completed' || currentStatus === 'expired') return false;
+    return new Date(signingValidUntil) < new Date();
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending_athlete_signature':
@@ -56,6 +62,10 @@ export const formatContractData = (contract) => {
         return 'text-blue-400';
       case 'cancelled':
         return 'text-red-400';
+      case 'rejected':
+        return 'text-red-400';
+      case 'expired':
+        return 'text-gray-400';
       default:
         return 'text-gray-400';
     }
@@ -71,10 +81,17 @@ export const formatContractData = (contract) => {
         return 'Completed';
       case 'cancelled':
         return 'Cancelled';
+      case 'rejected':
+        return 'Rejected';
+      case 'expired':
+        return 'Expired';
       default:
         return status;
     }
   };
+
+  // Check if contract is expired and override status
+  const actualStatus = isContractExpired(contract.signingValidUntil, contract.status) ? 'expired' : contract.status;
 
   return {
     id: contract.id,
@@ -93,8 +110,9 @@ export const formatContractData = (contract) => {
     dateCreated: formatDate(contract.createdAt),
     dateSigned: formatDate(contract.athleteSignedAt),
     expiryDate: formatDate(contract.expiryDate),
-    status: getStatusText(contract.status),
-    statusColor: getStatusColor(contract.status),
+    signingValidUntil: formatDate(contract.signingValidUntil),
+    status: getStatusText(actualStatus),
+    statusColor: getStatusColor(actualStatus),
     paymentResponsibility: contract.paymentResponsibility,
     contractFileUrl: contract.contractFileUrl,
     signedContractFileUrl: contract.signedContractFileUrl,

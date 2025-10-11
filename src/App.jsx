@@ -7,6 +7,7 @@ import RoleSelection from './pages/auth/role/RoleSelection';
 import BrandForm from './pages/auth/forms/BrandForm';
 import AthleteForm from './pages/auth/forms/AthleteForm';
 import Otp from './pages/auth/otp/Otp';
+import TwoFactorOtp from './pages/auth/otp/TwoFactorOtp';
 import ForgotPassword from './pages/auth/forgot-password/ForgotPassword';
 import OtpVerification from './pages/auth/otp-verification/OtpVerification';
 import ResetPassword from './pages/auth/reset-password/ResetPassword';
@@ -109,6 +110,7 @@ const App = () => {
         <Route path="/signup/athlete" element={<PublicRoute><AthleteForm /></PublicRoute>} />
         <Route path="/signup/brand" element={<PublicRoute><BrandForm /></PublicRoute>} />
         <Route path="/verify-otp" element={<PublicRoute><Otp /></PublicRoute>} />
+        <Route path="/two-factor-auth" element={<PublicRoute><TwoFactorOtp /></PublicRoute>} />
         <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
         <Route path="/otp-verification" element={<PublicRoute><OtpVerification /></PublicRoute>} />
         <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
