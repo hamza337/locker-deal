@@ -648,10 +648,10 @@ const AthleteContracts = () => {
                 </div>
               </div>
 
-              {/* Payment Responsibility */}
+              {/* Who is going to pay the contract fee ? */}
               {selectedContract.paymentResponsibility && (
                 <div>
-                  <label className="block text-gray-400 text-sm font-medium mb-2">Payment Responsibility</label>
+                  <label className="block text-gray-400 text-sm font-medium mb-2">Who is going to pay the contract fee ?</label>
                   <div className="text-white">{selectedContract.paymentResponsibility}</div>
                 </div>
               )}
@@ -670,7 +670,7 @@ const AthleteContracts = () => {
               
               {selectedContract.signingValidUntil && selectedContract.signingValidUntil !== 'N/A' && (
                 <div>
-                  <label className="block text-gray-400 text-sm font-medium mb-2">Offer valid till</label>
+                  <label className="block text-gray-400 text-sm font-medium mb-2">Offer valid till ?</label>
                   <div className={`font-semibold ${selectedContract.status === 'Expired' ? 'text-red-400' : 'text-white'}`}>
                     {selectedContract.signingValidUntil}
                   </div>

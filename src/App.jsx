@@ -18,7 +18,7 @@ import BrandDashboard from './pages/brandDashboard/brandDashboard';
 import SocketTest from './components/SocketTest';
 import SubscriptionPopup from './components/subscription/SubscriptionPopup';
 import PaymentSuccess from './pages/payment/PaymentSuccess';
-import EmailTemplateDemo from './pages/demo/EmailTemplateDemo';
+// import EmailTemplateDemo from './pages/demo/EmailTemplateDemo';
 
 // Role-based Private Route Component
 const PrivateRoute = ({ children, allowedRoles = [] }) => {

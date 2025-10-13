@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo, FaSmile, FaFileContract, FaDollarSign, FaArrowLeft } from 'react-icons/fa';
+import { FaSearch, FaMicrophone, FaEllipsisV, FaBars, FaTimes, FaPaperclip, FaRobot, FaFileSignature, FaCalendarAlt, FaFilePdf, FaImage, FaPaperPlane, FaDownload, FaPlay, FaFileAlt, FaClock, FaUser, FaVideo, FaSmile, FaFileContract, FaDollarSign, FaArrowLeft, FaInfoCircle } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import { getChatList, getChatHistory } from '../../services/chatService';
 import socketService from '../../services/socketService';
@@ -1079,6 +1079,11 @@ const Inbox = () => {
   const openContractModal = () => {
     if (!selectedChat) {
       toast.error('Please select a chat first');
+      return;
+    }
+    if (isAthlete) {
+      toast.error('Athletes cannot create contracts');
+      setShowDropdown(false);
       return;
     }
     
@@ -2206,21 +2211,7 @@ const Inbox = () => {
               {/* Dropdown Menu */}
               {showDropdown && (
                 <div className="absolute bottom-full left-0 mb-2 bg-gradient-to-b from-[#232626] to-[#1a1f1a] rounded-xl shadow-2xl border border-[#9afa00]/30 py-2 min-w-[200px] z-50">
-                  <button 
-                    onClick={() => {setShowDropdown(false); /* GPT functionality - static for now */}}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#9afa00]/10 transition-all text-left"
-                  >
-                    <FaRobot className="text-[#9afa00]" />
-                    <span>GPT</span>
-                  </button>
-                  <button 
-                    onClick={() => {setShowDropdown(false); fetchChatAttachments();}}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#9afa00]/10 transition-all text-left"
-                    disabled={loadingDocuments}
-                  >
-                    <FaFileSignature className="text-[#9afa00]" />
-                    <span>{loadingDocuments ? 'Loading...' : 'Sign a document'}</span>
-                  </button>
+                  
                   <button 
                     onClick={openMeetingModal}
                     className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#9afa00]/10 transition-all text-left"
@@ -2228,6 +2219,7 @@ const Inbox = () => {
                     <FaCalendarAlt className="text-[#9afa00]" />
                     <span>Schedule a meeting</span>
                   </button>
+                  {!isAthlete && (
                   <button 
                     onClick={openContractModal}
                     className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#9afa00]/10 transition-all text-left"
@@ -2235,6 +2227,7 @@ const Inbox = () => {
                     <FaFileContract className="text-[#9afa00]" />
                     <span>Create a contract</span>
                   </button>
+                  )}
                   <button 
                     onClick={() => {setShowDropdown(false); fileInputRef.current?.click();}}
                     className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#9afa00]/10 transition-all text-left"
@@ -2883,7 +2876,7 @@ const Inbox = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
                     <FaClock className="text-[#9afa00]" />
-                    Expiry Date *
+                    How long the contract payment will be held ? *
                   </label>
                   <input
                     type="date"
@@ -2897,7 +2890,11 @@ const Inbox = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
                     <FaCalendarAlt className="text-[#9afa00]" />
-                    Offer valid till *
+                    How long the offer is valid ? *
+                    <FaInfoCircle
+                      className="text-gray-400 hover:text-white cursor-help"
+                      title="This defines the offer validity period. After this date, the offer will expire and the contract will no longer accept signatures."
+                    />
                   </label>
                   <input
                     type="date"
@@ -2907,10 +2904,10 @@ const Inbox = () => {
                   />
                 </div>
 
-                {/* Payment Responsibility */}
+                {/* Who is going to pay the contract fee ? */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Payment Responsibility
+                    Who is going to pay the contract fee ?
                   </label>
                   <select
                     value={contractData.paymentResponsibility}

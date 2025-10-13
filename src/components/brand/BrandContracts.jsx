@@ -600,10 +600,10 @@ const BrandContracts = () => {
                  </div>
                </div>
 
-               {/* Payment Responsibility */}
+               {/* Who is going to pay the contract fee ? */}
                {selectedContract.paymentResponsibility && (
                  <div>
-                   <label className="block text-gray-400 text-sm font-medium mb-2">Payment Responsibility</label>
+                   <label className="block text-gray-400 text-sm font-medium mb-2">Who is going to pay the contract fee ?</label>
                    <div className="text-white">{selectedContract.paymentResponsibility}</div>
                  </div>
                )}
@@ -630,7 +630,7 @@ const BrandContracts = () => {
                )}
 
                {/* Rejection Reason */}
-               {selectedContract.rejectionReason && selectedContract.signed && (
+               {selectedContract.status === 'rejected_by_athlete' && selectedContract.rejectionReason && !selectedContract.signed && (
                  <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                    <label className="block text-red-400 text-sm font-medium mb-2">Rejection Reason</label>
                    <div className="text-red-300">{selectedContract.rejectionReason}</div>
@@ -755,7 +755,7 @@ const BrandContracts = () => {
                </div>
                
                <div>
-                  <label className="block text-gray-400 text-sm font-medium mb-2">Payment Responsibility</label>
+                  <label className="block text-gray-400 text-sm font-medium mb-2">Who is going to pay the contract fee ?</label>
                   <select
                     value={editFormData.paymentResponsibility}
                     onChange={(e) => setEditFormData({...editFormData, paymentResponsibility: e.target.value})}
