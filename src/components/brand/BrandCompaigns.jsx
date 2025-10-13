@@ -3,7 +3,7 @@ import { FaPlus, FaEdit, FaTrash, FaEye, FaTimes, FaDollarSign, FaCalendarAlt, F
 import toast from 'react-hot-toast';
 // import { createCampaign, getAllCampaigns, updateCampaign, deleteCampaign } from '../../services/campaignService';
 import subscriptionService from '../../services/subscriptionService';
-import { createCampaign, deleteCampaign, getAllCampaigns, updateCampaign } from '../../services/campaignservice';
+import { createCampaign, deleteCampaign, getAllCampaigns, updateCampaign } from '../../services/campaignService';
 
 const CAMPAIGN_STATUSES = {
   OPEN: 'OPEN',
