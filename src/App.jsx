@@ -156,10 +156,10 @@ const App = () => {
         />
         
         {/* Demo Routes */}
-        <Route 
+        {/* <Route 
           path="/demo/email-template" 
           element={<EmailTemplateDemo />}
-        />
+        /> */}
       </Routes>
       {/* Global Components */}
       <Toaster position="top-right" />
