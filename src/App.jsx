@@ -18,6 +18,7 @@ import BrandDashboard from './pages/brandDashboard/brandDashboard';
 import SocketTest from './components/SocketTest';
 import SubscriptionPopup from './components/subscription/SubscriptionPopup';
 import PaymentSuccess from './pages/payment/PaymentSuccess';
+import axios from 'axios';
 // import EmailTemplateDemo from './pages/demo/EmailTemplateDemo';
 
 // Role-based Private Route Component
@@ -62,6 +63,26 @@ const PublicRoute = ({ children }) => {
 };
 
 const App = () => {
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  const logoutUser = async () => {
+    const response = await axios.post(`${baseUrl}auth/check-token`, {
+      token: localStorage.getItem('access_token')
+    });
+    if (!response.data.valid) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+  };
+
+  useEffect(() => {
+    if (localStorage.getItem('access_token')){
+      logoutUser();
+    }
+  },[])
+
   useEffect(() => {
     // Initialize global socket connection when app starts
     const initializeSocket = () => {

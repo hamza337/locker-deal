@@ -181,7 +181,7 @@ const BrandAthlete = () => {
       }
     } catch (error) {
       console.error('Error fetching athlete profile:', error);
-      toast.error('Failed to load athlete profile 2');
+      toast.error('Failed to load athlete profile');
     } finally {
       setAthleteProfileLoading(false);
     }

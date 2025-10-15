@@ -60,7 +60,7 @@ export const getPresignedUrl = async (fileName, fileType) => {
     return response.data[0]; // Return the first (and only) file object
   } catch (error) {
     console.error('Error getting presigned URL:', error);
-    toast.error('Failed to prepare file upload');
+    // toast.error('Failed to prepare file upload');
     throw error;
   }
 };
@@ -77,7 +77,7 @@ export const uploadFileToS3 = async (presignedUrl, file) => {
     return response.status === 200;
   } catch (error) {
     console.error('Error uploading file to S3:', error);
-    toast.error('Failed to upload file');
+    // toast.error('Failed to upload file');
     throw error;
   }
 };
@@ -109,7 +109,7 @@ export const uploadFile = async (file) => {
       throw new Error('Upload failed');
     }
   } catch (error) {
-    toast.error('File upload failed', { id: 'file-upload' });
+    // toast.error('File upload failed', { id: 'file-upload' });
     throw error;
   }
 };

@@ -50,7 +50,7 @@ class VideoCallService {
       return true;
     } catch (error) {
       console.error('❌ Failed to initialize Agora client:', error);
-      toast.error('Failed to initialize video call service');
+      // toast.error('Failed to initialize video call service');
       return false;
     }
   }
@@ -90,15 +90,15 @@ class VideoCallService {
       const { hasCamera, hasMicrophone } = await this.checkDeviceAvailability();
       
       if (!hasCamera && !hasMicrophone) {
-        toast.error('No camera or microphone detected. Please connect devices and try again.');
+        // toast.error('No camera or microphone detected. Please connect devices and try again.');
         return false;
       }
       
       // Show informative messages about available devices
       if (!hasCamera && hasMicrophone) {
-        toast.error('No camera detected. Joining with audio only.');
+        // toast.error('No camera detected. Joining with audio only.');
       } else if (hasCamera && !hasMicrophone) {
-        toast.error('No microphone detected. Joining with video only.');
+        // toast.error('No microphone detected. Joining with video only.');
       }
 
       // Use original channel name since token is generated for it
@@ -149,7 +149,7 @@ class VideoCallService {
       return true;
     } catch (error) {
       console.error('❌ Failed to leave call:', error);
-      toast.error('Failed to leave video call');
+      // toast.error('Failed to leave video call');
       return false;
     }
   }
@@ -233,7 +233,7 @@ class VideoCallService {
       }
     } catch (error) {
       console.error('❌ Failed to publish local tracks:', error);
-      toast.error('Failed to publish video/audio');
+      // toast.error('Failed to publish video/audio');
       return false;
     }
   }
@@ -248,13 +248,13 @@ class VideoCallService {
         toast.success(this.isMuted ? 'Microphone muted' : 'Microphone unmuted');
         return this.isMuted;
       } else {
-        toast.error('Microphone not available. Please check permissions.');
+        // toast.error('Microphone not available. Please check permissions.');
         console.log('⚠️ No audio track available for mute toggle');
         return false;
       }
     } catch (error) {
       console.error('❌ Failed to toggle mute:', error);
-      toast.error('Failed to toggle microphone');
+      // toast.error('Failed to toggle microphone');
       return false;
     }
   }
@@ -269,13 +269,13 @@ class VideoCallService {
         toast.success(this.isVideoEnabled ? 'Video enabled' : 'Video disabled');
         return this.isVideoEnabled;
       } else {
-        toast.error('Camera not available. Please check permissions.');
+        // toast.error('Camera not available. Please check permissions.');
         console.log('⚠️ No video track available for video toggle');
         return false;
       }
     } catch (error) {
       console.error('❌ Failed to toggle video:', error);
-      toast.error('Failed to toggle video');
+      // toast.error('Failed to toggle video');
       return false;
     }
   }

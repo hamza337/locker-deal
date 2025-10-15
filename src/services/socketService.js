@@ -56,7 +56,7 @@ class SocketService {
       console.log('✅ Socket connected successfully!', this.socket.id);
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      toast.success('Connected to chat server!');
+      // toast.success('Connected to chat server!');
       
       // Join user room
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -76,7 +76,7 @@ class SocketService {
     this.socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
       this.isConnected = false;
-      toast.error('Disconnected from chat server');
+      // toast.error('Disconnected from chat server');
       
       // Notify all connection listeners
       this.connectionListeners.forEach(callback => callback(false));
@@ -91,13 +91,13 @@ class SocketService {
         console.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
         setTimeout(() => this.connect(), 2000 * this.reconnectAttempts);
       } else {
-        toast.error('Failed to connect to chat server');
+        // toast.error('Failed to connect to chat server');
       }
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
       console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
-      toast.success('Reconnected to chat server!');
+      // toast.success('Reconnected to chat server!');
     });
 
     // Listen for the specific receive_message event
@@ -199,7 +199,7 @@ class SocketService {
   // Send a message
   sendMessage(receiverId, text, type = 'text', mediaUrl = null) {
     if (!this.socket?.connected) {
-      toast.error('Not connected to chat server');
+      // toast.error('Not connected to chat server');
       return false;
     }
 
@@ -251,7 +251,7 @@ class SocketService {
   joinRoom(otherUserId) {
     if (!this.socket?.connected) {
       console.error('❌ Socket not connected, cannot join room');
-      toast.error('Not connected to chat server');
+      // toast.error('Not connected to chat server');
       return false;
     }
 
